@@ -1,3 +1,4 @@
+// frontend/src/App.jsx
 import React, { useEffect, useState } from "react";
 import PassengerPanel from "./components/PassengerPanel.jsx";
 import DriverPanel from "./components/DriverPanel.jsx";
@@ -6,7 +7,8 @@ function App() {
   const [datos, setDatos] = useState({
     taxis: [],
     clientes: [],
-    asignaciones: []
+    asignaciones: [],
+    viajes: []
   });
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
@@ -24,7 +26,8 @@ function App() {
       setDatos({
         taxis: json.taxis || [],
         clientes: json.clientes || [],
-        asignaciones: json.asignaciones || []
+        asignaciones: json.asignaciones || [],
+        viajes: json.viajes || []
       });
     } catch (e) {
       console.error(e);
@@ -38,7 +41,7 @@ function App() {
     cargarEstado();
   }, []);
 
-  const { taxis, clientes, asignaciones } = datos;
+  const { taxis, clientes, asignaciones, viajes } = datos;
 
   const taxisLibres = taxis.filter((t) => !t.ocupado).length;
   const taxisOcupados = taxis.filter((t) => t.ocupado).length;
@@ -189,6 +192,7 @@ function App() {
             taxis={taxis}
             clientes={clientes}
             asignaciones={asignaciones}
+            viajes={viajes}
             onRefrescar={cargarEstado}
           />
         )}

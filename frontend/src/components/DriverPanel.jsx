@@ -1,9 +1,9 @@
+// frontend/src/components/DriverPanel.jsx
 import React, { useState } from "react";
 
-function DriverPanel({ taxis, clientes, asignaciones, onRefrescar }) {
+function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
   const [mensaje, setMensaje] = useState("");
 
-  // Taxi 0 como "yo"
   const taxiYo = taxis.length > 0 ? taxis[0] : null;
 
   const asignacionesTaxiYo = taxiYo
@@ -13,6 +13,10 @@ function DriverPanel({ taxis, clientes, asignaciones, onRefrescar }) {
   const clientesDeTaxiYo = asignacionesTaxiYo
     .map((a) => clientes.find((c) => c.id === a[0]))
     .filter(Boolean);
+
+  const viajesTaxiYo = taxiYo
+    ? viajes.filter((v) => v.taxi_id === taxiYo.id)
+    : [];
 
   const aplicarCierre = async () => {
     try {
@@ -42,7 +46,7 @@ function DriverPanel({ taxis, clientes, asignaciones, onRefrescar }) {
         <h2 style={{ fontSize: "18px", marginBottom: "8px" }}>Vista taxista</h2>
         <p style={{ fontSize: "13px", opacity: 0.8, marginBottom: "12px" }}>
           Simula la pantalla de un conductor afiliado a UNIETAXI, con sus
-          ganas y el cierre contable (20% de comisión).
+          ganancias y el cierre contable (20% de comisión).
         </p>
 
         <div
@@ -131,7 +135,7 @@ function DriverPanel({ taxis, clientes, asignaciones, onRefrescar }) {
         </div>
       </section>
 
-      {/* Clientes asignados + tabla servicios */}
+      {/* Clientes + viajes */}
       <section>
         <h3 style={{ fontSize: "15px", marginBottom: "8px" }}>
           Tus clientes asignados
@@ -146,6 +150,60 @@ function DriverPanel({ taxis, clientes, asignaciones, onRefrescar }) {
         {clienteRows(clientesDeTaxiYo, taxiYo)}
 
         <h3 style={{ fontSize: "15px", marginTop: "16px", marginBottom: "6px" }}>
+          Tus viajes (origen / destino / tarifa)
+        </h3>
+
+        {taxiYo && viajesTaxiYo.length === 0 && (
+          <p style={{ fontSize: "13px", opacity: 0.8 }}>
+            Aún no has realizado viajes desde la vista pasajero.
+          </p>
+        )}
+
+        {viajesTaxiYo.length > 0 && (
+          <div
+            style={{
+              backgroundColor: "#020617",
+              borderRadius: "16px",
+              border: "1px solid #1f2937",
+              padding: "10px",
+              maxHeight: "200px",
+              overflowY: "auto",
+              marginBottom: "10px"
+            }}
+          >
+            {viajesTaxiYo.map((v, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "6px 4px",
+                  borderBottom: "1px solid #111827",
+                  fontSize: "13px"
+                }}
+              >
+                <div>
+                  <div>
+                    {v.origen} → {v.destino}
+                  </div>
+                  <div style={{ fontSize: "11px", opacity: 0.8 }}>
+                    Duración: {v.duracion_min} min
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div>
+                    <strong>{v.tarifa.toFixed(2)} €</strong>
+                  </div>
+                  <div style={{ fontSize: "11px", opacity: 0.8 }}>
+                    Distancia: {v.distancia_aprox_km} km
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <h3 style={{ fontSize: "15px", marginTop: "8px", marginBottom: "6px" }}>
           Vista rápida de todos los servicios
         </h3>
         {asignaciones.length === 0 ? (

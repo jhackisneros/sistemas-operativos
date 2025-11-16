@@ -35,6 +35,9 @@ class SistemaAtencion:
         self._cola_solicitudes: List["Cliente"] = []
         self._asignaciones: List[Tuple[int, int]] = []  # (id_cliente, id_taxi)
 
+        # Historial de viajes creados desde la API
+        self._historial_viajes: List[dict] = []
+
         # Mecanismos de sincronización
         self._lock = threading.Lock()
         self._sem_solicitudes = threading.Semaphore(0)
@@ -174,18 +177,11 @@ class SistemaAtencion:
         tarifa = tarifa_base + tarifa_km * distancia
         tarifa = round(tarifa, 2)
 
-        # Tiempo simulado: 24h -> 5 minutos => aquí usamos algo simple:
+        # Tiempo simulado en minutos (24h -> 5 min se explica a nivel conceptual)
         duracion_min = max(3, distancia * 4)  # p.e. 4 minutos por "km"
         duracion_min = round(duracion_min, 1)
 
-        # Actualizar economía del taxi
-        with self._lock:
-            taxi.total_bruto += tarifa
-            taxi.viajes_realizados += 1
-
-        # Devolvemos info al frontend
-        return {
-            "ok": True,
+        viaje = {
             "origen": origen,
             "destino": destino,
             "taxi_id": taxi.id,
@@ -195,13 +191,24 @@ class SistemaAtencion:
             "duracion_min": duracion_min,
         }
 
+        # Actualizar economía del taxi y guardar el viaje
+        with self._lock:
+            taxi.total_bruto += tarifa
+            taxi.viajes_realizados += 1
+            self._historial_viajes.append(viaje)
+            # Para la demo liberamos el taxi inmediatamente (viaje "finalizado")
+            taxi.ocupado = False
+
+        # Respuesta al frontend
+        return {"ok": True, **viaje}
+
     # ------------------------------------------------------------------
     # CIERRE CONTABLE (20% comisión UNIETAXI)
     # ------------------------------------------------------------------
 
     def cierre_contable(self):
         """
-        Simula el cierre contable del día (24h -> 5 minutos en la demo):
+        Simula el cierre contable del día:
         - A cada taxi se le descuenta el 20% de su total_bruto acumulado.
         - Se actualizan total_neto y total_comision.
         - Se resetea total_bruto (nuevo día).
@@ -253,3 +260,8 @@ class SistemaAtencion:
                 }
                 for c in self._clientes
             ]
+
+    def snapshot_viajes(self):
+        """Devuelve una copia del historial de viajes."""
+        with self._lock:
+            return list(self._historial_viajes)

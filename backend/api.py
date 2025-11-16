@@ -17,7 +17,7 @@ CORS(app)  # Para permitir peticiones desde localhost:5173 (frontend)
 
 # Al arrancar la API, creamos escenario si no existe
 if main.sistema is None:
-    main.crear_escenario(num_taxis=3, num_clientes=5)
+    main.crear_escenario(num_taxis=3, num_clientes=0)
 
 
 @app.route("/estado")
@@ -30,6 +30,7 @@ def estado():
             "taxis": main.sistema.snapshot_taxis(),
             "clientes": main.sistema.snapshot_clientes(),
             "asignaciones": main.sistema.snapshot_asignaciones(),
+            "viajes": main.sistema.snapshot_viajes(),
         }
     )
 

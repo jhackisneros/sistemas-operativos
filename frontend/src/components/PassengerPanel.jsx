@@ -1,3 +1,4 @@
+// frontend/src/components/PassengerPanel.jsx
 import React, { useState } from "react";
 
 const LUGARES = [
@@ -9,8 +10,18 @@ const LUGARES = [
 ];
 
 function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
-  const [origen, setOrigen] = useState("Retiro");
-  const [destino, setDestino] = useState("Centro");
+  // Origen aleatorio al cargar el componente
+  const [origen, setOrigen] = useState(() => {
+    const idx = Math.floor(Math.random() * LUGARES.length);
+    return LUGARES[idx];
+  });
+
+  // Destino inicial: el primer lugar distinto al origen
+  const [destino, setDestino] = useState(() => {
+    const opciones = LUGARES.filter((l) => l !== LUGARES[0]);
+    return opciones[0] || LUGARES[0];
+  });
+
   const [infoViaje, setInfoViaje] = useState(null);
   const [mensaje, setMensaje] = useState("");
 
@@ -33,7 +44,6 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
 
       setInfoViaje(data);
       setMensaje("Viaje creado correctamente. Taxi asignado.");
-      // Actualizamos estado global (tarjetas, taxis, etc.)
       onRefrescar && onRefrescar();
     } catch (e) {
       console.error(e);
@@ -138,7 +148,7 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
         </div>
       </section>
 
-      {/* Columna derecha: lista de taxis (como antes) */}
+      {/* Columna derecha: taxis activos */}
       <section>
         <h3 style={{ fontSize: "15px", marginBottom: "8px" }}>Taxis activos</h3>
         {taxis.length === 0 ? (
