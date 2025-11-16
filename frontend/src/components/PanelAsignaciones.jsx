@@ -1,21 +1,26 @@
 import React from "react";
 
+const thEstilo = {
+  border: "1px solid #ccc",
+  padding: "6px",
+  textAlign: "left",
+  backgroundColor: "#f0f0f0"
+};
+
+const tdEstilo = {
+  border: "1px solid #ccc",
+  padding: "6px"
+};
+
 function PanelAsignaciones({ taxis, clientes, asignaciones }) {
   return (
-    <div style={{ display: "grid", gap: "20px" }}>
-      {/* ASIGNACIONES */}
+    <div style={{ display: "grid", gap: "20px", marginTop: "20px" }}>
       <section>
         <h2>Asignaciones Cliente → Taxi</h2>
         {asignaciones.length === 0 ? (
-          <p style={{ fontSize: "14px" }}>No hay asignaciones todavía.</p>
+          <p>No hay asignaciones todavía.</p>
         ) : (
-          <table
-            style={{
-              borderCollapse: "collapse",
-              width: "100%",
-              fontSize: "14px",
-            }}
-          >
+          <table style={{ borderCollapse: "collapse", width: "100%" }}>
             <thead>
               <tr>
                 <th style={thEstilo}>Cliente</th>
@@ -34,23 +39,16 @@ function PanelAsignaciones({ taxis, clientes, asignaciones }) {
         )}
       </section>
 
-      {/* TAXIS */}
       <section>
         <h2>Taxis</h2>
         {taxis.length === 0 ? (
-          <p style={{ fontSize: "14px" }}>No hay taxis registrados.</p>
+          <p>No hay taxis registrados.</p>
         ) : (
-          <table
-            style={{
-              borderCollapse: "collapse",
-              width: "100%",
-              fontSize: "14px",
-            }}
-          >
+          <table style={{ borderCollapse: "collapse", width: "100%" }}>
             <thead>
               <tr>
                 <th style={thEstilo}>ID</th>
-                <th style={thEstilo}>Posición (x, y)</th>
+                <th style={thEstilo}>Posición</th>
                 <th style={thEstilo}>Rating</th>
                 <th style={thEstilo}>Estado</th>
               </tr>
@@ -71,23 +69,16 @@ function PanelAsignaciones({ taxis, clientes, asignaciones }) {
         )}
       </section>
 
-      {/* CLIENTES */}
       <section>
         <h2>Clientes</h2>
         {clientes.length === 0 ? (
-          <p style={{ fontSize: "14px" }}>No hay clientes registrados.</p>
+          <p>No hay clientes registrados.</p>
         ) : (
-          <table
-            style={{
-              borderCollapse: "collapse",
-              width: "100%",
-              fontSize: "14px",
-            }}
-          >
+          <table style={{ borderCollapse: "collapse", width: "100%" }}>
             <thead>
               <tr>
                 <th style={thEstilo}>ID</th>
-                <th style={thEstilo}>Posición (x, y)</th>
+                <th style={thEstilo}>Posición</th>
                 <th style={thEstilo}>¿Tiene taxi?</th>
                 <th style={thEstilo}>Taxi asignado</th>
               </tr>
@@ -114,17 +105,5 @@ function PanelAsignaciones({ taxis, clientes, asignaciones }) {
     </div>
   );
 }
-
-const thEstilo = {
-  border: "1px solid #ccc",
-  padding: "6px",
-  textAlign: "left",
-  backgroundColor: "#f0f0f0",
-};
-
-const tdEstilo = {
-  border: "1px solid #ccc",
-  padding: "6px",
-};
 
 export default PanelAsignaciones;
