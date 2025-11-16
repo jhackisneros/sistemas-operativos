@@ -1,6 +1,6 @@
-// frontend/src/App.jsx
 import React, { useEffect, useState } from "react";
-import PanelAsignaciones from "./components/PanelAsignaciones";
+import PassengerPanel from "./components/PassengerPanel.jsx";
+import DriverPanel from "./components/DriverPanel.jsx";
 
 function App() {
   const [datos, setDatos] = useState({
@@ -10,6 +10,7 @@ function App() {
   });
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
+  const [rol, setRol] = useState("pasajero"); // "pasajero" o "taxista"
 
   const cargarEstado = async () => {
     try {
@@ -37,34 +38,184 @@ function App() {
     cargarEstado();
   }, []);
 
+  const { taxis, clientes, asignaciones } = datos;
+
+  const taxisLibres = taxis.filter((t) => !t.ocupado).length;
+  const taxisOcupados = taxis.filter((t) => t.ocupado).length;
+  const clientesConTaxi = clientes.filter((c) => c.tiene_taxi).length;
+  const clientesSinTaxi = clientes.filter((c) => !c.tiene_taxi).length;
+
   return (
     <div
       style={{
-        fontFamily: "sans-serif",
-        padding: "20px",
-        maxWidth: "900px",
-        margin: "0 auto"
+        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+        minHeight: "100vh",
+        background:
+          "linear-gradient(135deg, #0f172a 0%, #020617 40%, #111827 100%)",
+        color: "white",
+        padding: "20px"
       }}
     >
-      <h1>UNIETAXI - Panel simple</h1>
+      {/* “Navbar” */}
+      <header
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "20px"
+        }}
+      >
+        <div>
+          <h1 style={{ margin: 0, fontSize: "24px" }}>UNIETAXI</h1>
+          <p style={{ margin: 0, fontSize: "13px", opacity: 0.8 }}>
+            Simulador tipo Uber (pasajero / taxista)
+          </p>
+        </div>
 
-      <div style={{ marginBottom: "10px" }}>
-        <button onClick={cargarEstado} disabled={cargando}>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button
+            onClick={() => setRol("pasajero")}
+            style={{
+              padding: "8px 14px",
+              borderRadius: "999px",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "13px",
+              background: rol === "pasajero" ? "#22c55e" : "#1f2937",
+              color: "white"
+            }}
+          >
+            Soy pasajero
+          </button>
+          <button
+            onClick={() => setRol("taxista")}
+            style={{
+              padding: "8px 14px",
+              borderRadius: "999px",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "13px",
+              background: rol === "taxista" ? "#3b82f6" : "#1f2937",
+              color: "white"
+            }}
+          >
+            Soy taxista
+          </button>
+        </div>
+      </header>
+
+      {/* Barra de acciones */}
+      <section
+        style={{
+          marginBottom: "20px",
+          display: "flex",
+          gap: "10px",
+          alignItems: "center",
+          flexWrap: "wrap"
+        }}
+      >
+        <button
+          onClick={cargarEstado}
+          disabled={cargando}
+          style={{
+            padding: "8px 16px",
+            borderRadius: "999px",
+            border: "none",
+            cursor: "pointer",
+            fontSize: "14px",
+            background: "#fbbf24",
+            color: "#111827",
+            fontWeight: 600
+          }}
+        >
           {cargando ? "Actualizando..." : "Actualizar estado"}
         </button>
-      </div>
 
-      {error && (
-        <p style={{ color: "red", fontSize: "14px" }}>
-          {error}
-        </p>
-      )}
+        {error && (
+          <span style={{ color: "#f97316", fontSize: "13px" }}>{error}</span>
+        )}
+      </section>
 
-      <PanelAsignaciones
-        taxis={datos.taxis}
-        clientes={datos.clientes}
-        asignaciones={datos.asignaciones}
-      />
+      {/* Tarjetas resumen */}
+      <section
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gap: "12px",
+          marginBottom: "20px"
+        }}
+      >
+        <ResumenCard
+          titulo="Taxis libres"
+          valor={taxisLibres}
+          color="#22c55e"
+        />
+        <ResumenCard
+          titulo="Taxis ocupados"
+          valor={taxisOcupados}
+          color="#ef4444"
+        />
+        <ResumenCard
+          titulo="Clientes con taxi"
+          valor={clientesConTaxi}
+          color="#38bdf8"
+        />
+        <ResumenCard
+          titulo="Clientes esperando"
+          valor={clientesSinTaxi}
+          color="#eab308"
+        />
+      </section>
+
+      {/* Panel central tipo Uber */}
+      <main
+        style={{
+          backgroundColor: "#020617",
+          borderRadius: "18px",
+          padding: "18px",
+          border: "1px solid #1f2937",
+          boxShadow: "0 10px 40px rgba(0,0,0,0.4)"
+        }}
+      >
+        {rol === "pasajero" ? (
+          <PassengerPanel
+            taxis={taxis}
+            clientes={clientes}
+            asignaciones={asignaciones}
+          />
+        ) : (
+          <DriverPanel
+            taxis={taxis}
+            clientes={clientes}
+            asignaciones={asignaciones}
+          />
+        )}
+      </main>
+    </div>
+  );
+}
+
+function ResumenCard({ titulo, valor, color }) {
+  return (
+    <div
+      style={{
+        background: "#020617",
+        borderRadius: "14px",
+        padding: "10px 12px",
+        border: "1px solid #1f2937"
+      }}
+    >
+      <p style={{ margin: 0, fontSize: "12px", opacity: 0.7 }}>{titulo}</p>
+      <p
+        style={{
+          margin: 0,
+          marginTop: "4px",
+          fontSize: "20px",
+          fontWeight: 700
+        }}
+      >
+        <span style={{ color }}>{valor}</span>
+      </p>
     </div>
   );
 }
