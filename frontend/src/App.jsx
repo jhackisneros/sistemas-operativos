@@ -1,3 +1,4 @@
+// frontend/src/App.jsx
 import React, { useEffect, useState } from "react";
 import PanelAsignaciones from "./components/PanelAsignaciones";
 
@@ -45,11 +46,19 @@ function App() {
         margin: "0 auto"
       }}
     >
-      <h1>UNIETAXI – Panel simple</h1>
-      <button onClick={cargarEstado} disabled={cargando}>
-        {cargando ? "Actualizando..." : "Actualizar estado"}
-      </button>
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      <h1>UNIETAXI - Panel simple</h1>
+
+      <div style={{ marginBottom: "10px" }}>
+        <button onClick={cargarEstado} disabled={cargando}>
+          {cargando ? "Actualizando..." : "Actualizar estado"}
+        </button>
+      </div>
+
+      {error && (
+        <p style={{ color: "red", fontSize: "14px" }}>
+          {error}
+        </p>
+      )}
 
       <PanelAsignaciones
         taxis={datos.taxis}
