@@ -10,25 +10,25 @@ const LUGARES = [
 ];
 
 function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
-  // Origen aleatorio al cargar el componente
   const [origen, setOrigen] = useState(() => {
     const idx = Math.floor(Math.random() * LUGARES.length);
     return LUGARES[idx];
   });
 
-  // Destino inicial: simplemente el primero distinto del origen
   const [destino, setDestino] = useState(() => {
     const opciones = LUGARES.filter((l) => l !== LUGARES[0]);
     return opciones[0] || LUGARES[0];
   });
 
   const [infoViaje, setInfoViaje] = useState(null);
+  const [esperaInfo, setEsperaInfo] = useState(null); // caso sin taxis
   const [mensaje, setMensaje] = useState("");
 
   const solicitarViaje = async () => {
     try {
       setMensaje("");
       setInfoViaje(null);
+      setEsperaInfo(null);
 
       const resp = await fetch("http://localhost:5000/viaje", {
         method: "POST",
@@ -37,13 +37,25 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
       });
 
       const data = await resp.json();
-      if (!resp.ok || !data.ok) {
+
+      // Si ok === false pero 200 → no hay taxi ahora, solo tiempo de espera
+      if (data.ok === false && data.motivo === "sin_taxis") {
+        setEsperaInfo(data);
+        setMensaje(
+          data.mensaje ||
+            "No hay taxis libres. Se estima un tiempo de espera aproximado."
+        );
+        return;
+      }
+
+      if (!resp.ok || data.ok === false) {
         setMensaje(data.mensaje || "No se pudo crear el viaje.");
         return;
       }
 
+      // Viaje creado con taxi asignado
       setInfoViaje(data);
-      setMensaje("Viaje creado. Esperando confirmación del taxista...");
+      setMensaje("Viaje creado. El taxista verá tu solicitud.");
       onRefrescar && onRefrescar();
     } catch (e) {
       console.error(e);
@@ -51,9 +63,32 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
     }
   };
 
+  const cancelarViaje = async () => {
+    if (!infoViaje) return;
+    try {
+      setMensaje("");
+      const resp = await fetch("http://localhost:5000/viaje/cancelar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_viaje: infoViaje.id_viaje })
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        setMensaje(data.mensaje || "No se pudo cancelar el viaje.");
+        return;
+      }
+      setMensaje("Has cancelado el viaje.");
+      setInfoViaje(null);
+      onRefrescar && onRefrescar();
+    } catch (e) {
+      console.error(e);
+      setMensaje("Error al cancelar el viaje.");
+    }
+  };
+
   return (
     <div style={{ display: "grid", gap: "16px", gridTemplateColumns: "2fr 3fr" }}>
-      {/* Columna izquierda: formulario tipo Uber */}
+      {/* Columna izquierda */}
       <section>
         <h2 style={{ fontSize: "18px", marginBottom: "8px" }}>Vista pasajero</h2>
         <p style={{ fontSize: "13px", opacity: 0.8, marginBottom: "12px" }}>
@@ -113,6 +148,32 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
             </p>
           )}
 
+          {/* Caso: no hay taxis libres → se muestra estimación de espera */}
+          {esperaInfo && (
+            <div
+              style={{
+                marginTop: "10px",
+                padding: "8px",
+                borderRadius: "12px",
+                backgroundColor: "#020617",
+                border: "1px dashed #eab30880",
+                fontSize: "13px"
+              }}
+            >
+              <p style={{ margin: 0 }}>
+                No hay taxis libres ahora mismo en {origen}.
+              </p>
+              <p style={{ margin: 0 }}>
+                Tiempo de espera estimado:{" "}
+                <strong>{esperaInfo.tiempo_espera_min} minutos</strong>.
+              </p>
+              <p style={{ margin: 0, fontSize: "12px", opacity: 0.8 }}>
+                Puedes volver a intentarlo más tarde.
+              </p>
+            </div>
+          )}
+
+          {/* Caso: viaje creado con taxi asignado */}
           {infoViaje && (
             <div
               style={{
@@ -141,14 +202,46 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
                 Tarifa estimada: <strong>{infoViaje.tarifa} €</strong>
               </p>
               <p style={{ margin: 0, fontSize: "12px", opacity: 0.8 }}>
-                Duración simulada: {infoViaje.duracion_min} min
+                Duración simulada del viaje: {infoViaje.duracion_min} minutos.
               </p>
+
+              <div style={{ marginTop: "8px", display: "flex", gap: "8px" }}>
+                <button
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: "999px",
+                    border: "none",
+                    cursor: "default",
+                    fontSize: "12px",
+                    backgroundColor: "#16a34a",
+                    color: "#020617",
+                    fontWeight: 600
+                  }}
+                >
+                  Confirmado
+                </button>
+                <button
+                  onClick={cancelarViaje}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: "999px",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    backgroundColor: "#ef4444",
+                    color: "white",
+                    fontWeight: 600
+                  }}
+                >
+                  Cancelar viaje
+                </button>
+              </div>
             </div>
           )}
         </div>
       </section>
 
-      {/* Columna derecha: taxis activos (info de apoyo) */}
+      {/* Columna derecha: taxis activos */}
       <section>
         <h3 style={{ fontSize: "15px", marginBottom: "8px" }}>Taxis activos</h3>
         {taxis.length === 0 ? (

@@ -1,5 +1,13 @@
 // frontend/src/components/DriverPanel.jsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+
+const LUGARES = [
+  "Retiro",
+  "Centro",
+  "Aeropuerto",
+  "Universidad",
+  "Estación Norte"
+];
 
 function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
   const [mensaje, setMensaje] = useState("");
@@ -59,6 +67,32 @@ function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
     }
   };
 
+  // Simulación: cada cierto tiempo "aparecen" pasajeros aleatorios
+  useEffect(() => {
+    if (!taxiYo) return;
+    const id = setInterval(async () => {
+      try {
+        const origen =
+          LUGARES[Math.floor(Math.random() * LUGARES.length)];
+        let destino = origen;
+        while (destino === origen) {
+          destino = LUGARES[Math.floor(Math.random() * LUGARES.length)];
+        }
+
+        await fetch("http://localhost:5000/viaje", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ origen, destino })
+        });
+        onRefrescar && onRefrescar();
+      } catch (e) {
+        console.error("Error creando viaje aleatorio para taxista", e);
+      }
+    }, 15000); // cada 15 segundos aprox. aparece un nuevo pasajero
+
+    return () => clearInterval(id);
+  }, [taxiYo, onRefrescar]);
+
   return (
     <div style={{ display: "grid", gap: "16px", gridTemplateColumns: "2fr 3fr" }}>
       {/* Columna izquierda: info del taxista */}
@@ -66,7 +100,7 @@ function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
         <h2 style={{ fontSize: "18px", marginBottom: "8px" }}>Vista taxista</h2>
         <p style={{ fontSize: "13px", opacity: 0.8, marginBottom: "12px" }}>
           Simula la pantalla de un conductor afiliado a UNIETAXI, con sus
-          ganancias y el cierre contable (20% de comisión).
+          ganancias y la evolución de los viajes.
         </p>
 
         <div
@@ -138,14 +172,14 @@ function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
         </div>
       </section>
 
-      {/* Columna derecha: viajes pendientes / aceptados / finalizados */}
+      {/* Columna derecha: viajes */}
       <section>
         <h3 style={{ fontSize: "15px", marginBottom: "6px" }}>
           Viajes pendientes (nuevos pasajeros)
         </h3>
         {viajesPendientes.length === 0 ? (
           <p style={{ fontSize: "13px", opacity: 0.8 }}>
-            No tienes viajes pendientes.
+            No tienes viajes pendientes ahora mismo.
           </p>
         ) : (
           <div
@@ -164,7 +198,7 @@ function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
                 key={v.id_viaje}
                 style={{
                   display: "flex",
-                  justifyContent: "space_between",
+                  justifyContent: "space-between",
                   alignItems: "center",
                   padding: "6px 4px",
                   borderBottom: "1px solid #111827",
@@ -176,7 +210,8 @@ function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
                     #{v.id_viaje} · {v.origen} → {v.destino}
                   </div>
                   <div style={{ fontSize: "11px", opacity: 0.8 }}>
-                    Tarifa: {v.tarifa} € · {v.duracion_min} min
+                    Tarifa: {v.tarifa} € · {v.duracion_min} min · Restante:{" "}
+                    {v.tiempo_restante} min
                   </div>
                 </div>
                 <button
@@ -235,7 +270,8 @@ function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
                     #{v.id_viaje} · {v.origen} → {v.destino}
                   </div>
                   <div style={{ fontSize: "11px", opacity: 0.8 }}>
-                    Tarifa: {v.tarifa} € · {v.duracion_min} min
+                    Tarifa: {v.tarifa} € · {v.duracion_min} min · Restante:{" "}
+                    {v.tiempo_restante} min
                   </div>
                 </div>
                 <button

@@ -11,7 +11,6 @@ app = Flask(__name__)
 if CORS:
     CORS(app)
 
-# Aseguramos que el escenario esté creado
 if main.sistema is None:
     main.crear_escenario()
 
@@ -47,7 +46,9 @@ def crear_viaje():
 
     resultado = main.sistema.crear_viaje_desde_lugares(origen, destino)
     if not resultado.get("ok", False):
-        return jsonify(resultado), 400
+        # Si no hay taxis libres, devolvemos 200 pero ok=False para que el front
+        # pueda mostrar la espera y el usuario decida aceptar/rechazar.
+        return jsonify(resultado), 200
 
     return jsonify(resultado)
 
@@ -96,6 +97,28 @@ def finalizar_viaje():
     return jsonify({"ok": True, "mensaje": "Viaje finalizado"})
 
 
+@app.route("/viaje/cancelar", methods=["POST"])
+def cancelar_viaje():
+    if main.sistema is None:
+        return jsonify({"ok": False, "mensaje": "Sistema no inicializado"}), 500
+
+    data = request.get_json() or {}
+    id_viaje = data.get("id_viaje")
+    if id_viaje is None:
+        return jsonify({"ok": False, "mensaje": "id_viaje es requerido"}), 400
+
+    try:
+        id_viaje = int(id_viaje)
+    except ValueError:
+        return jsonify({"ok": False, "mensaje": "id_viaje debe ser un entero"}), 400
+
+    ok = main.sistema.cancelar_viaje(id_viaje)
+    if not ok:
+        return jsonify({"ok": False, "mensaje": "No se pudo cancelar el viaje"}), 400
+
+    return jsonify({"ok": True, "mensaje": "Viaje cancelado"})
+
+
 @app.route("/cierre", methods=["POST"])
 def cierre_contable():
     if main.sistema is None:
@@ -106,7 +129,6 @@ def cierre_contable():
 
 
 if __name__ == "__main__":
-    # Por si ejecutas: python -m backend.api
     if main.sistema is None:
         main.crear_escenario()
     app.run(debug=True)
