@@ -42,23 +42,23 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
 
       const data = await resp.json();
 
-      if (data.ok === False || data.ok === false) {
-        // Caso sin taxis
-        if (data.motivo === "sin_taxis") {
-          setEsperaInfo(data);
-          setMensaje(
-            data.mensaje ||
-              "No hay taxis libres. Se estima un tiempo de espera aproximado."
-          );
-          return;
-        }
+      // Caso: no hay taxis libres → ok === false, motivo === "sin_taxis"
+      if (data.ok === false && data.motivo === "sin_taxis") {
+        setEsperaInfo(data);
+        setMensaje(
+          data.mensaje ||
+            "No hay taxis libres. Se estima un tiempo de espera aproximado."
+        );
+        return;
       }
 
+      // Otros errores
       if (!resp.ok || data.ok === false) {
         setMensaje(data.mensaje || "No se pudo crear el viaje.");
         return;
       }
 
+      // Viaje creado correctamente
       setInfoViaje(data);
       setMensaje("Viaje creado. El taxista verá tu solicitud.");
       onRefrescar && onRefrescar();
@@ -182,6 +182,7 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
             </p>
           )}
 
+          {/* Caso: no hay taxis libres */}
           {esperaInfo && (
             <div
               style={{
@@ -206,6 +207,7 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
             </div>
           )}
 
+          {/* Caso: viaje creado */}
           {infoViaje && (
             <div
               style={{
