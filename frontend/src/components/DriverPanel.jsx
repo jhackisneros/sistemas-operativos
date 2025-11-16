@@ -1,8 +1,36 @@
 // frontend/src/components/DriverPanel.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
   const [mensaje, setMensaje] = useState("");
+  const [reloj, setReloj] = useState("00:00");
+
+  // ⏰ Reloj simulado: 24 horas en 5 minutos reales
+  useEffect(() => {
+    const inicioReal = Date.now();
+    const DURACION_DIA_REAL_MS = 5 * 60 * 1000; // 5 minutos en ms
+    const MINUTOS_DIA_SIMULADO = 24 * 60; // 1440 minutos
+
+    const id = setInterval(() => {
+      const ahora = Date.now();
+      const transcurrido = ahora - inicioReal;
+
+      // Ciclo que se repite cada 5 minutos
+      const ciclo = transcurrido % DURACION_DIA_REAL_MS;
+
+      const fraccion = ciclo / DURACION_DIA_REAL_MS; // 0..1
+      const minutosSimulados = Math.floor(fraccion * MINUTOS_DIA_SIMULADO); // 0..1439
+
+      const horas = Math.floor(minutosSimulados / 60);
+      const minutos = minutosSimulados % 60;
+
+      const hh = horas.toString().padStart(2, "0");
+      const mm = minutos.toString().padStart(2, "0");
+      setReloj(`${hh}:${mm}`);
+    }, 500); // actualizamos 2 veces por segundo
+
+    return () => clearInterval(id);
+  }, []);
 
   const taxiYo = taxis.length > 0 ? taxis[0] : null;
 
@@ -58,6 +86,7 @@ function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
     }
   };
 
+  // Botón de cierre contable: lo sigues usando tú manualmente
   const hacerCierre = async () => {
     try {
       setMensaje("");
@@ -83,9 +112,39 @@ function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
     >
       <section>
         <h2 style={{ fontSize: "18px", marginBottom: "8px" }}>Vista taxista</h2>
+
+        {/* Reloj del día simulado */}
+        <div
+          style={{
+            marginBottom: "8px",
+            padding: "8px 10px",
+            borderRadius: "999px",
+            border: "1px solid #1f2937",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "8px",
+            fontSize: "13px",
+            backgroundColor: "#020617"
+          }}
+        >
+          <span style={{ opacity: 0.7 }}>
+            Reloj del día simulado (24h → 5 min):
+          </span>
+          <span
+            style={{
+              fontFamily: "monospace",
+              fontWeight: 600,
+              letterSpacing: "1px"
+            }}
+          >
+            {reloj}
+          </span>
+        </div>
+
         {taxiYo ? (
           <div
             style={{
+              marginTop: "8px",
               background:
                 "radial-gradient(circle at top left, #0ea5e933, transparent 60%)",
               borderRadius: "16px",
@@ -124,7 +183,7 @@ function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
             </p>
             <p style={{ margin: 0, fontSize: "13px" }}>
               Comisión total pagada a UNIETAXI:{" "}
-                <strong>{taxiYo.total_comision.toFixed(2)} €</strong>
+              <strong>{taxiYo.total_comision.toFixed(2)} €</strong>
             </p>
             <p style={{ margin: 0, fontSize: "13px" }}>
               Viajes realizados: <strong>{taxiYo.viajes_realizados}</strong>
