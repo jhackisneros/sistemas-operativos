@@ -21,14 +21,18 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
   });
 
   const [infoViaje, setInfoViaje] = useState(null);
-  const [esperaInfo, setEsperaInfo] = useState(null); // caso sin taxis
+  const [esperaInfo, setEsperaInfo] = useState(null);
   const [mensaje, setMensaje] = useState("");
+  const [valoracion, setValoracion] = useState(0);
+  const [mensajeValoracion, setMensajeValoracion] = useState("");
 
   const solicitarViaje = async () => {
     try {
       setMensaje("");
+      setMensajeValoracion("");
       setInfoViaje(null);
       setEsperaInfo(null);
+      setValoracion(0);
 
       const resp = await fetch("http://localhost:5000/viaje", {
         method: "POST",
@@ -38,14 +42,16 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
 
       const data = await resp.json();
 
-      // Si ok === false pero 200 → no hay taxi ahora, solo tiempo de espera
-      if (data.ok === false && data.motivo === "sin_taxis") {
-        setEsperaInfo(data);
-        setMensaje(
-          data.mensaje ||
-            "No hay taxis libres. Se estima un tiempo de espera aproximado."
-        );
-        return;
+      if (data.ok === False || data.ok === false) {
+        // Caso sin taxis
+        if (data.motivo === "sin_taxis") {
+          setEsperaInfo(data);
+          setMensaje(
+            data.mensaje ||
+              "No hay taxis libres. Se estima un tiempo de espera aproximado."
+          );
+          return;
+        }
       }
 
       if (!resp.ok || data.ok === false) {
@@ -53,7 +59,6 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
         return;
       }
 
-      // Viaje creado con taxi asignado
       setInfoViaje(data);
       setMensaje("Viaje creado. El taxista verá tu solicitud.");
       onRefrescar && onRefrescar();
@@ -86,13 +91,42 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
     }
   };
 
+  const enviarValoracion = async () => {
+    if (!infoViaje || valoracion < 1 || valoracion > 5) {
+      setMensajeValoracion("Elige entre 1 y 5 estrellas.");
+      return;
+    }
+    try {
+      setMensajeValoracion("");
+      const resp = await fetch("http://localhost:5000/viaje/calificar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id_viaje: infoViaje.id_viaje,
+          estrellas: valoracion
+        })
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        setMensajeValoracion(
+          data.mensaje || "No se pudo registrar la valoración."
+        );
+        return;
+      }
+      setMensajeValoracion("¡Gracias por tu valoración!");
+      onRefrescar && onRefrescar();
+    } catch (e) {
+      console.error(e);
+      setMensajeValoracion("Error al enviar la valoración.");
+    }
+  };
+
   return (
     <div style={{ display: "grid", gap: "16px", gridTemplateColumns: "2fr 3fr" }}>
-      {/* Columna izquierda */}
       <section>
         <h2 style={{ fontSize: "18px", marginBottom: "8px" }}>Vista pasajero</h2>
         <p style={{ fontSize: "13px", opacity: 0.8, marginBottom: "12px" }}>
-          Elige origen y destino y la app te asigna un taxi y calcula la tarifa.
+          Elige origen y destino y la app te asigna un taxi, calcula la tarifa y, al final, puedes calificar el servicio.
         </p>
 
         <div
@@ -148,7 +182,6 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
             </p>
           )}
 
-          {/* Caso: no hay taxis libres → se muestra estimación de espera */}
           {esperaInfo && (
             <div
               style={{
@@ -173,7 +206,6 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
             </div>
           )}
 
-          {/* Caso: viaje creado con taxi asignado */}
           {infoViaje && (
             <div
               style={{
@@ -236,12 +268,83 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
                   Cancelar viaje
                 </button>
               </div>
+
+              {/* Bloque de valoración tipo test de estrellas */}
+              <div
+                style={{
+                  marginTop: "10px",
+                  paddingTop: "8px",
+                  borderTop: "1px solid #1f2937"
+                }}
+              >
+                <p style={{ margin: 0, fontSize: "12px", opacity: 0.8 }}>
+                  Al finalizar el viaje, califica al conductor:
+                </p>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "4px",
+                    marginTop: "4px",
+                    marginBottom: "4px"
+                  }}
+                >
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setValoracion(n)}
+                      style={{
+                        width: "28px",
+                        height: "28px",
+                        borderRadius: "999px",
+                        border:
+                          valoracion === n
+                            ? "2px solid #facc15"
+                            : "1px solid #374151",
+                        backgroundColor:
+                          valoracion >= n ? "#fbbf24" : "#020617",
+                        color: valoracion >= n ? "#020617" : "#e5e7eb",
+                        cursor: "pointer",
+                        fontSize: "14px"
+                      }}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={enviarValoracion}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: "999px",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    backgroundColor: "#facc15",
+                    color: "#020617",
+                    fontWeight: 600
+                  }}
+                >
+                  Enviar valoración
+                </button>
+                {mensajeValoracion && (
+                  <p
+                    style={{
+                      marginTop: "4px",
+                      fontSize: "12px",
+                      color: "#fbbf24"
+                    }}
+                  >
+                    {mensajeValoracion}
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </div>
       </section>
 
-      {/* Columna derecha: taxis activos */}
       <section>
         <h3 style={{ fontSize: "15px", marginBottom: "8px" }}>Taxis activos</h3>
         {taxis.length === 0 ? (

@@ -5,12 +5,13 @@ try:
 except ImportError:
     CORS = None
 
-from . import main  # main.sistema, main.crear_escenario
+from . import main
 
 app = Flask(__name__)
 if CORS:
     CORS(app)
 
+# Inicializar escenario al arrancar
 if main.sistema is None:
     main.crear_escenario()
 
@@ -19,7 +20,6 @@ if main.sistema is None:
 def estado():
     if main.sistema is None:
         return jsonify({"ok": False, "mensaje": "Sistema no inicializado"}), 500
-
     estado = main.sistema.snapshot_estado()
     return jsonify(estado)
 
@@ -34,22 +34,14 @@ def crear_viaje():
     destino = data.get("destino")
 
     if not origen or not destino:
-        return (
-            jsonify(
-                {
-                    "ok": False,
-                    "mensaje": "Se requieren 'origen' y 'destino' en el JSON.",
-                }
-            ),
-            400,
-        )
+        return jsonify(
+            {"ok": False, "mensaje": "Se requieren 'origen' y 'destino' en el JSON."}
+        ), 400
 
     resultado = main.sistema.crear_viaje_desde_lugares(origen, destino)
-    if not resultado.get("ok", False):
-        # Si no hay taxis libres, devolvemos 200 pero ok=False para que el front
-        # pueda mostrar la espera y el usuario decida aceptar/rechazar.
-        return jsonify(resultado), 200
 
+    # Aunque no haya taxis (ok = False), devolvemos 200 para que el frontend
+    # pueda mostrar el mensaje y el tiempo_espera_min
     return jsonify(resultado)
 
 
@@ -119,8 +111,47 @@ def cancelar_viaje():
     return jsonify({"ok": True, "mensaje": "Viaje cancelado"})
 
 
+@app.route("/viaje/calificar", methods=["POST"])
+def calificar_viaje():
+    """
+    Endpoint para que el pasajero envíe la valoración (1–5 estrellas)
+    de un viaje concreto.
+    """
+    if main.sistema is None:
+        return jsonify({"ok": False, "mensaje": "Sistema no inicializado"}), 500
+
+    data = request.get_json() or {}
+    id_viaje = data.get("id_viaje")
+    estrellas = data.get("estrellas")
+
+    if id_viaje is None or estrellas is None:
+        return jsonify(
+            {"ok": False, "mensaje": "id_viaje y estrellas son requeridos"}
+        ), 400
+
+    try:
+        id_viaje = int(id_viaje)
+        estrellas = int(estrellas)
+    except ValueError:
+        return jsonify(
+            {"ok": False, "mensaje": "id_viaje y estrellas deben ser enteros"}
+        ), 400
+
+    ok = main.sistema.calificar_viaje(id_viaje, estrellas)
+    if not ok:
+        return jsonify(
+            {"ok": False, "mensaje": "No se pudo registrar la valoración"}
+        ), 400
+
+    return jsonify({"ok": True, "mensaje": "Valoración registrada"})
+
+
 @app.route("/cierre", methods=["POST"])
 def cierre_contable():
+    """
+    Cierre contable manual (además del automático del hilo de simulación).
+    Te sirve para probar en demos.
+    """
     if main.sistema is None:
         return jsonify({"ok": False, "mensaje": "Sistema no inicializado"}), 500
 

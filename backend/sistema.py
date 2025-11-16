@@ -1,11 +1,10 @@
 # backend/sistema.py
 import threading
 import math
-import random
 import time
 from typing import List, Optional, Tuple, Dict
 
-# ----------------- Lugares simbólicos para la "ciudad" -----------------
+# ----------------- Lugares simbólicos -----------------
 
 LOCACIONES: Dict[str, Tuple[float, float]] = {
     "Retiro": (1.0, 1.0),
@@ -24,7 +23,8 @@ class Taxi:
         self.id: int = id_
         self.x: float = x
         self.y: float = y
-        self.rating: int = rating
+        # rating medio del taxi (se irá actualizando con las valoraciones)
+        self.rating: float = float(rating)
 
         # Estado de ocupación
         self.ocupado: bool = False
@@ -35,6 +35,10 @@ class Taxi:
         self.total_comision: float = 0.0   # dinero pagado a UNIETAXI
         self.viajes_realizados: int = 0    # número de viajes
 
+        # Para calcular rating promedio (media de estrellas)
+        self.total_valoraciones: int = 0
+        self.suma_valoraciones: int = 0
+
 
 class Cliente:
     def __init__(self, id_: int, x: float, y: float) -> None:
@@ -43,6 +47,7 @@ class Cliente:
         self.y: float = y
 
         self.taxi_asignado: Optional[Taxi] = None
+        # Semáforo para el caso de asignación "clásica"
         self.sem_asignacion = threading.Semaphore(0)
 
 
@@ -51,13 +56,14 @@ class Cliente:
 
 class SistemaAtencion:
     """
-    MONITOR DEL SISTEMA UNIETAXI
+    Monitor principal del sistema UNIETAXI.
 
-    - Mantiene taxis, clientes, solicitudes y viajes.
-    - Usa un hilo de atención para las solicitudes clásicas.
-    - Usa un hilo de simulación para que los viajes "avancen en el tiempo":
-      * los viajes van consumiendo tiempo_restante
-      * cuando llega a 0 → viaje finalizado → taxi vuelve a estar libre.
+    - Gestiona taxis, clientes, asignaciones y viajes.
+    - Hilo de atención: procesa peticiones clásicas.
+    - Hilo de simulación:
+        * hace avanzar el tiempo de los viajes
+        * libera taxis al terminar
+        * cada “día simulado” aplica el cierre contable (20%).
     """
 
     def __init__(self) -> None:
@@ -65,7 +71,7 @@ class SistemaAtencion:
         self._taxis: List[Taxi] = []
         self._clientes: List[Cliente] = []
         self._cola_solicitudes: List[Cliente] = []
-        self._asignaciones: List[Tuple[int, int]] = []  # (id_cliente, id_taxi)
+        self._asignaciones: List[Tuple[int, int]] = []
 
         # Historial de viajes "tipo Uber"
         self._historial_viajes: List[dict] = []
@@ -75,7 +81,7 @@ class SistemaAtencion:
         self._lock = threading.Lock()
         self._sem_solicitudes = threading.Semaphore(0)
 
-        # Control de hilos
+        # Hilos internos
         self._detener = False
         self._hilo_atencion = threading.Thread(
             target=self._bucle_atencion,
@@ -88,16 +94,21 @@ class SistemaAtencion:
             name="HiloSimulacionViajes",
         )
 
+        # Reloj simulado
+        self._minutos_simulados: int = 0
+        self._dias_simulados: int = 0
+
     # ------------------------------------------------------------------
     # Gestión general
     # ------------------------------------------------------------------
 
     def iniciar(self) -> None:
-        """Arranca los hilos internos del sistema."""
+        """Arranca los hilos internos del monitor."""
         self._hilo_atencion.start()
         self._hilo_simulacion.start()
 
     def detener(self) -> None:
+        """Detiene los hilos (para pruebas)."""
         self._detener = True
         self._sem_solicitudes.release()
         self._hilo_atencion.join(timeout=2)
@@ -112,12 +123,16 @@ class SistemaAtencion:
             self._clientes.append(cliente)
 
     def solicitar_taxi(self, cliente: Cliente) -> None:
+        """
+        Versión clásica: el cliente se encola y el hilo de atención asigna taxi.
+        (Esta parte la puedes comentar en el informe como uso de semáforo + monitor)
+        """
         with self._lock:
             self._cola_solicitudes.append(cliente)
         self._sem_solicitudes.release()
 
     # ------------------------------------------------------------------
-    # Hilo de atención (para solicitudes clásicas x,y)
+    # Hilo de atención (cola de solicitudes)
     # ------------------------------------------------------------------
 
     def _bucle_atencion(self) -> None:
@@ -145,10 +160,11 @@ class SistemaAtencion:
             return self._cola_solicitudes.pop(0)
 
     # ------------------------------------------------------------------
-    # Selección de taxi (por cliente o por posición)
+    # Selección de taxi
     # ------------------------------------------------------------------
 
     def _seleccionar_taxi_para(self, cliente: Cliente) -> Optional[Taxi]:
+        """Selecciona taxi basándose en la posición del cliente."""
         with self._lock:
             taxis_libres = [t for t in self._taxis if not t.ocupado]
             if not taxis_libres:
@@ -169,6 +185,7 @@ class SistemaAtencion:
             return taxi_elegido
 
     def _seleccionar_taxi_para_posicion(self, x: float, y: float) -> Optional[Taxi]:
+        """Versión para las coordenadas de los lugares simbólicos."""
         with self._lock:
             taxis_libres = [t for t in self._taxis if not t.ocupado]
             if not taxis_libres:
@@ -195,8 +212,8 @@ class SistemaAtencion:
         """
         Crea un viaje 'a lo Uber' desde dos lugares simbólicos.
 
-        - Si hay taxis libres → asigna uno, crea viaje pendiente y deja el taxi ocupado.
-        - Si no hay taxis libres → devuelve tiempo de espera estimado, sin crear viaje.
+        - Si hay taxis libres → asigna uno, deja taxi ocupado y crea viaje.
+        - Si no hay taxis libres → devuelve tiempo de espera estimado.
         """
         if origen not in LOCACIONES or destino not in LOCACIONES:
             return {
@@ -210,7 +227,7 @@ class SistemaAtencion:
 
         taxi = self._seleccionar_taxi_para_posicion(ox, oy)
         if taxi is None:
-            # Simulación simple: si no hay taxis, decimos "20 min de espera"
+            # Caso: no hay taxis libres
             return {
                 "ok": False,
                 "motivo": "sin_taxis",
@@ -241,6 +258,8 @@ class SistemaAtencion:
                 "duracion_min": duracion_min,
                 # tiempo_restante en "minutos simulados"
                 "tiempo_restante": int(duracion_min),
+                # rating del cliente (se rellenará cuando valore)
+                "rating_cliente": None,
             }
 
             taxi.ocupado = True
@@ -252,6 +271,7 @@ class SistemaAtencion:
         return {"ok": True, **viaje}
 
     def aceptar_viaje(self, id_viaje: int) -> bool:
+        """El taxista acepta un viaje pendiente."""
         with self._lock:
             for v in self._historial_viajes:
                 if v["id_viaje"] == id_viaje:
@@ -264,6 +284,7 @@ class SistemaAtencion:
     def finalizar_viaje(self, id_viaje: int) -> bool:
         """
         Marca el viaje como finalizado y libera el taxi.
+        (el hilo de simulación también lo hace cuando tiempo_restante llega a 0)
         """
         with self._lock:
             viaje = None
@@ -290,8 +311,8 @@ class SistemaAtencion:
 
     def cancelar_viaje(self, id_viaje: int) -> bool:
         """
-        El pasajero rechaza/cancela el viaje.
-        Si el taxi estaba ocupado por este viaje, se libera.
+        El pasajero cancela el viaje; si el taxi estaba ocupado por este viaje,
+        se vuelve a liberar.
         """
         with self._lock:
             viaje = None
@@ -316,23 +337,76 @@ class SistemaAtencion:
 
             return True
 
+    def calificar_viaje(self, id_viaje: int, estrellas: int) -> bool:
+        """
+        Guarda la valoración del cliente (1–5 estrellas) y actualiza
+        el rating promedio del taxi.
+        """
+        if estrellas < 1 or estrellas > 5:
+            return False
+
+        with self._lock:
+            viaje = None
+            for v in self._historial_viajes:
+                if v["id_viaje"] == id_viaje:
+                    viaje = v
+                    break
+
+            if viaje is None:
+                return False
+
+            taxi_id = viaje["taxi_id"]
+            taxi = None
+            for t in self._taxis:
+                if t.id == taxi_id:
+                    taxi = t
+                    break
+
+            if taxi is None:
+                return False
+
+            # Guardamos rating del cliente en el viaje
+            viaje["rating_cliente"] = estrellas
+
+            # Actualizamos estadísticas del taxi
+            taxi.total_valoraciones += 1
+            taxi.suma_valoraciones += estrellas
+            taxi.rating = round(
+                taxi.suma_valoraciones / taxi.total_valoraciones, 1
+            )
+
+            print(
+                f"[RATING] Taxi {taxi.id}: nueva valoración {estrellas}⭐ → rating medio {taxi.rating}"
+            )
+
+            return True
+
     # ------------------------------------------------------------------
-    # Hilo de simulación: avanza viajes y libera taxis
+    # Hilo de simulación: avanza viajes y hace cierre contable
     # ------------------------------------------------------------------
 
     def _bucle_simulacion(self) -> None:
-    #    """
-    #    Hilo que simula el paso del tiempo para los viajes.
-
-    #    Cada 5 segundos de tiempo real:
-    #   - Reduce tiempo_restante de viajes pendientes/aceptados.
-    #    - Cuando llega a 0 → finaliza el viaje y libera taxi.
-     #   
+        """
+        Cada 5 segundos de tiempo real:
+        - Avanza 1 minuto simulado.
+        - Reduce tiempo_restante de viajes.
+        - Libera taxis cuando termina un viaje.
+        - Cada 60 minutos simulados aplica cierre contable (20%).
+        """
         while not self._detener:
             time.sleep(5.0)
+
+            hacer_cierre = False
+
             with self._lock:
+                # avanzamos reloj simulado
+                self._minutos_simulados += 1
+
+                # actualizar viajes
                 for v in self._historial_viajes:
-                    if v["estado"] in ("pendiente", "aceptado") and v.get("tiempo_restante") is not None:
+                    if v["estado"] in ("pendiente", "aceptado") and v.get(
+                        "tiempo_restante"
+                    ) is not None:
                         if v["tiempo_restante"] > 0:
                             v["tiempo_restante"] -= 1
                             print(
@@ -349,24 +423,45 @@ class SistemaAtencion:
                                     )
                                     break
 
+                # cada 60 minutos simulados → 1 día
+                if self._minutos_simulados > 0 and self._minutos_simulados % 60 == 0:
+                    self._dias_simulados += 1
+                    hacer_cierre = True
+                    print(
+                        f"[SIM] Fin del día simulado {self._dias_simulados}. Se aplicará cierre contable."
+                    )
+
+            # hacemos el cierre FUERA del lock para no bloquear el hilo
+            if hacer_cierre:
+                self.cierre_contable()
 
     # ------------------------------------------------------------------
-    # Cierre contable
+    # Cierre contable (20%)
     # ------------------------------------------------------------------
 
     def cierre_contable(self) -> None:
+        """
+        Aplica la comisión del 20% a la facturación bruta y
+        acumula neto y comisión para cada taxi.
+        """
         with self._lock:
             for t in self._taxis:
                 if t.total_bruto <= 0:
                     continue
+
                 comision = round(t.total_bruto * 0.20, 2)
                 neto = round(t.total_bruto - comision, 2)
+
                 t.total_comision += comision
                 t.total_neto += neto
                 t.total_bruto = 0.0
 
+                print(
+                    f"[CIERRE] Taxi {t.id}: comisión={comision}, neto={neto}, acumulado_neto={t.total_neto}"
+                )
+
     # ------------------------------------------------------------------
-    # Snapshots
+    # Snapshots para la API / frontend
     # ------------------------------------------------------------------
 
     def snapshot_asignaciones(self) -> List[Tuple[int, int]]:
