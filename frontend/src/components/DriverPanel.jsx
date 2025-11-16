@@ -4,6 +4,7 @@ import React, { useState } from "react";
 function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
   const [mensaje, setMensaje] = useState("");
 
+  // Tomamos el taxi 0 como "yo"
   const taxiYo = taxis.length > 0 ? taxis[0] : null;
 
   const asignacionesTaxiYo = taxiYo
@@ -118,7 +119,7 @@ function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
                   fontWeight: 600
                 }}
               >
-                Simular cierre contable (24h → 5 min)
+                Aplicar cierre contable
               </button>
 
               {mensaje && (

@@ -14,6 +14,9 @@ function App() {
   const [error, setError] = useState("");
   const [rol, setRol] = useState("pasajero"); // "pasajero" o "taxista"
 
+  // Reloj simulado: cada tick = 5 minutos
+  const [simTick, setSimTick] = useState(0); // 1 tick = 5 minutos simulados
+
   const cargarEstado = async () => {
     try {
       setCargando(true);
@@ -42,6 +45,23 @@ function App() {
   }, []);
 
   const { taxis, clientes, asignaciones, viajes } = datos;
+
+  // ------------------ Reloj simulado (solo visual) ------------------
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setSimTick((t) => t + 1);
+    }, 1000); // cada segundo = 5 minutos simulados
+    return () => clearInterval(id);
+  }, []);
+
+  const minutosSimulados = (simTick * 5) % (24 * 60); // 24h = 1440 min
+  const horas = Math.floor(minutosSimulados / 60);
+  const mins = minutosSimulados % 60;
+  const horaSimuladaStr =
+    horas.toString().padStart(2, "0") + ":" + mins.toString().padStart(2, "0");
+
+  // ------------------ Métricas resumen ------------------
 
   const taxisLibres = taxis.filter((t) => !t.ocupado).length;
   const taxisOcupados = taxis.filter((t) => t.ocupado).length;
@@ -75,35 +95,40 @@ function App() {
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: "8px" }}>
-          <button
-            onClick={() => setRol("pasajero")}
-            style={{
-              padding: "8px 14px",
-              borderRadius: "999px",
-              border: "none",
-              cursor: "pointer",
-              fontSize: "13px",
-              background: rol === "pasajero" ? "#22c55e" : "#1f2937",
-              color: "white"
-            }}
-          >
-            Soy pasajero
-          </button>
-          <button
-            onClick={() => setRol("taxista")}
-            style={{
-              padding: "8px 14px",
-              borderRadius: "999px",
-              border: "none",
-              cursor: "pointer",
-              fontSize: "13px",
-              background: rol === "taxista" ? "#3b82f6" : "#1f2937",
-              color: "white"
-            }}
-          >
-            Soy taxista
-          </button>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ display: "flex", gap: "8px", marginBottom: "4px" }}>
+            <button
+              onClick={() => setRol("pasajero")}
+              style={{
+                padding: "8px 14px",
+                borderRadius: "999px",
+                border: "none",
+                cursor: "pointer",
+                fontSize: "13px",
+                background: rol === "pasajero" ? "#22c55e" : "#1f2937",
+                color: "white"
+              }}
+            >
+              Soy pasajero
+            </button>
+            <button
+              onClick={() => setRol("taxista")}
+              style={{
+                padding: "8px 14px",
+                borderRadius: "999px",
+                border: "none",
+                cursor: "pointer",
+                fontSize: "13px",
+                background: rol === "taxista" ? "#3b82f6" : "#1f2937",
+                color: "white"
+              }}
+            >
+              Soy taxista
+            </button>
+          </div>
+          <div style={{ fontSize: "12px", opacity: 0.8 }}>
+            Hora simulada: <strong>{horaSimuladaStr}</strong>
+          </div>
         </div>
       </header>
 
@@ -170,7 +195,7 @@ function App() {
         />
       </section>
 
-      {/* Panel central */}
+      {/* Panel central: o pasajero o taxista */}
       <main
         style={{
           backgroundColor: "#020617",

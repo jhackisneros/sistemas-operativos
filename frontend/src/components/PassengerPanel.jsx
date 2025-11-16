@@ -16,7 +16,7 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
     return LUGARES[idx];
   });
 
-  // Destino inicial: el primer lugar distinto al origen
+  // Destino inicial: simplemente el primero distinto del origen
   const [destino, setDestino] = useState(() => {
     const opciones = LUGARES.filter((l) => l !== LUGARES[0]);
     return opciones[0] || LUGARES[0];
@@ -148,7 +148,7 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
         </div>
       </section>
 
-      {/* Columna derecha: taxis activos */}
+      {/* Columna derecha: taxis activos (info de apoyo) */}
       <section>
         <h3 style={{ fontSize: "15px", marginBottom: "8px" }}>Taxis activos</h3>
         {taxis.length === 0 ? (
