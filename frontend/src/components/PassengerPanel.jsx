@@ -43,7 +43,7 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
       }
 
       setInfoViaje(data);
-      setMensaje("Viaje creado correctamente. Taxi asignado.");
+      setMensaje("Viaje creado. Esperando confirmación del taxista...");
       onRefrescar && onRefrescar();
     } catch (e) {
       console.error(e);

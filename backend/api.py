@@ -1,73 +1,112 @@
 # backend/api.py
-"""
-API con Flask para exponer el estado de UNIETAXI al frontend (React).
-
-Rutas:
-- GET /estado          -> estado general (taxis, clientes, asignaciones)
-- POST /viaje          -> crea un viaje a partir de origen/destino simbólicos
-- POST /cierre         -> aplica el cierre contable (20% comisión)
-"""
-
 from flask import Flask, jsonify, request
-from flask_cors import CORS
-from . import main
+try:
+    from flask_cors import CORS
+except ImportError:
+    CORS = None
+
+from . import main  # main.sistema, main.crear_escenario
 
 app = Flask(__name__)
-CORS(app)  # Para permitir peticiones desde localhost:5173 (frontend)
+if CORS:
+    CORS(app)
 
-# Al arrancar la API, creamos escenario si no existe
+# Aseguramos que el escenario esté creado
 if main.sistema is None:
-    main.crear_escenario(num_taxis=3, num_clientes=0)
+    main.crear_escenario()
 
 
-@app.route("/estado")
+@app.route("/estado", methods=["GET"])
 def estado():
-    if main.sistema is None:
-        return jsonify({"error": "Sistema no inicializado"}), 500
-
-    return jsonify(
-        {
-            "taxis": main.sistema.snapshot_taxis(),
-            "clientes": main.sistema.snapshot_clientes(),
-            "asignaciones": main.sistema.snapshot_asignaciones(),
-            "viajes": main.sistema.snapshot_viajes(),
-        }
-    )
-
-
-@app.post("/viaje")
-def viaje():
-    """
-    Crea un viaje tipo Uber desde un origen y destino predefinidos.
-    Espera JSON:
-    {
-        "origen": "Retiro",
-        "destino": "Centro"
-    }
-    """
     if main.sistema is None:
         return jsonify({"ok": False, "mensaje": "Sistema no inicializado"}), 500
 
-    data = request.get_json(silent=True) or {}
+    estado = main.sistema.snapshot_estado()
+    return jsonify(estado)
+
+
+@app.route("/viaje", methods=["POST"])
+def crear_viaje():
+    if main.sistema is None:
+        return jsonify({"ok": False, "mensaje": "Sistema no inicializado"}), 500
+
+    data = request.get_json() or {}
     origen = data.get("origen")
     destino = data.get("destino")
 
+    if not origen or not destino:
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "mensaje": "Se requieren 'origen' y 'destino' en el JSON.",
+                }
+            ),
+            400,
+        )
+
     resultado = main.sistema.crear_viaje_desde_lugares(origen, destino)
-    status = 200 if resultado.get("ok") else 400
-    return jsonify(resultado), status
+    if not resultado.get("ok", False):
+        return jsonify(resultado), 400
+
+    return jsonify(resultado)
 
 
-@app.post("/cierre")
-def cierre():
-    """
-    Aplica el cierre contable (20% de comisión a los taxis).
-    """
+@app.route("/viaje/aceptar", methods=["POST"])
+def aceptar_viaje():
+    if main.sistema is None:
+        return jsonify({"ok": False, "mensaje": "Sistema no inicializado"}), 500
+
+    data = request.get_json() or {}
+    id_viaje = data.get("id_viaje")
+    if id_viaje is None:
+        return jsonify({"ok": False, "mensaje": "id_viaje es requerido"}), 400
+
+    try:
+        id_viaje = int(id_viaje)
+    except ValueError:
+        return jsonify({"ok": False, "mensaje": "id_viaje debe ser un entero"}), 400
+
+    ok = main.sistema.aceptar_viaje(id_viaje)
+    if not ok:
+        return jsonify({"ok": False, "mensaje": "No se pudo aceptar el viaje"}), 400
+
+    return jsonify({"ok": True, "mensaje": "Viaje aceptado"})
+
+
+@app.route("/viaje/finalizar", methods=["POST"])
+def finalizar_viaje():
+    if main.sistema is None:
+        return jsonify({"ok": False, "mensaje": "Sistema no inicializado"}), 500
+
+    data = request.get_json() or {}
+    id_viaje = data.get("id_viaje")
+    if id_viaje is None:
+        return jsonify({"ok": False, "mensaje": "id_viaje es requerido"}), 400
+
+    try:
+        id_viaje = int(id_viaje)
+    except ValueError:
+        return jsonify({"ok": False, "mensaje": "id_viaje debe ser un entero"}), 400
+
+    ok = main.sistema.finalizar_viaje(id_viaje)
+    if not ok:
+        return jsonify({"ok": False, "mensaje": "No se pudo finalizar el viaje"}), 400
+
+    return jsonify({"ok": True, "mensaje": "Viaje finalizado"})
+
+
+@app.route("/cierre", methods=["POST"])
+def cierre_contable():
     if main.sistema is None:
         return jsonify({"ok": False, "mensaje": "Sistema no inicializado"}), 500
 
     main.sistema.cierre_contable()
-    return jsonify({"ok": True, "taxis": main.sistema.snapshot_taxis()}), 200
+    return jsonify({"ok": True, "mensaje": "Cierre contable aplicado"})
 
 
 if __name__ == "__main__":
-    app.run(port=5000, debug=True)
+    # Por si ejecutas: python -m backend.api
+    if main.sistema is None:
+        main.crear_escenario()
+    app.run(debug=True)
