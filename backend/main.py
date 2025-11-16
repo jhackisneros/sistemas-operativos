@@ -1,87 +1,69 @@
 # backend/main.py
 """
-Punto de entrada principal para la simulación de UNIETAXI (backend).
+Configura el escenario inicial de UNIETAXI.
 
-- Crea el SistemaAtencion (monitor).
-- Crea N taxis (hilos).
-- Crea M clientes (hilos).
-- Arranca el hilo interno del sistema.
-- Espera a que los clientes terminen y muestra las asignaciones finales.
+IMPORTANTE:
+- NO lanzamos hilos de clientes ni simulaciones raras aquí.
+- Solo creamos taxis (libres) y opcionalmente algunos clientes.
+- Arrancamos el monitor (SistemaAtencion.iniciar), que internamente
+  lanza los hilos de atención y de simulación de viajes.
 """
 
-from .sistema import SistemaAtencion
-from .taxi import Taxi
-from .cliente import Cliente
-import time
+from .sistema import SistemaAtencion, Taxi, Cliente
+import random
 
-# Variables globales simples (útiles para api.py)
+# Variables globales a las que accede api.py
 sistema: SistemaAtencion | None = None
 taxis: list[Taxi] = []
 clientes: list[Cliente] = []
 
 
-def crear_escenario(num_taxis: int = 3, num_clientes: int = 5):
-    """Crea las entidades principales y arranca la simulación básica."""
+def crear_escenario(num_taxis: int = 3, num_clientes: int = 0) -> SistemaAtencion:
+    """
+    Crea un sistema nuevo, con taxis todos LIBRES,
+    y arranca los hilos internos del monitor.
+    """
     global sistema, taxis, clientes
 
+    # Creamos el monitor
     sistema = SistemaAtencion()
-    sistema.iniciar()
 
-    # Crear taxis
     taxis = []
+    clientes = []
+
+    # Creamos taxis con posiciones aleatorias en un cuadrado 0..5 x 0..5
     for i in range(num_taxis):
-        t = Taxi(id_taxi=i, x=i * 1.0, y=i * 1.0, sistema=sistema)
-        t.start()
+        x = random.uniform(0, 5)
+        y = random.uniform(0, 5)
+        rating = random.randint(3, 5)
+        t = Taxi(i, x, y, rating)
+
+        # aseguramos que empiezan totalmente libres, sin viajes previos
+        t.ocupado = False
+        t.total_bruto = 0.0
+        t.total_neto = 0.0
+        t.total_comision = 0.0
+        t.viajes_realizados = 0
+
+        sistema.registrar_taxi(t)
         taxis.append(t)
 
-    # Crear clientes
-    clientes = []
+    # (Opcional) Creamos clientes, pero NO lanzamos hilos ni solicitudes automáticas
     for i in range(num_clientes):
-        c = Cliente(id_cliente=i, sistema=sistema)
-        c.start()
+        x = random.uniform(0, 5)
+        y = random.uniform(0, 5)
+        c = Cliente(i, x, y)
+        sistema.registrar_cliente(c)
         clientes.append(c)
 
+    # MUY IMPORTANTE: arrancar los hilos internos (atención + simulación)
+    sistema.iniciar()
 
-def esperar_final_clientes(timeout: float = 5.0):
-    """
-    Espera a que los clientes terminen su flujo principal.
-
-    No esperamos a los taxis porque son hilos "infinitos" (daemon).
-    """
-    inicio = time.time()
-    for c in clientes:
-        tiempo_restante = timeout - (time.time() - inicio)
-        if tiempo_restante <= 0:
-            break
-        c.join(timeout=tiempo_restante)
+    print("[MAIN] Escenario creado con", len(taxis), "taxis y", len(clientes), "clientes.")
+    return sistema
 
 
-def mostrar_resumen():
-    """Imprime por consola el estado final de las asignaciones."""
-    print("\n=== RESUMEN ASIGNACIONES UNIETAXI ===")
-    if sistema is None:
-        print("Sistema no inicializado.")
-        return
-
-    asignaciones = sistema.snapshot_asignaciones()
-    if not asignaciones:
-        print("No se ha realizado ninguna asignación.")
-    else:
-        for id_cliente, id_taxi in asignaciones:
-            print(f"Cliente {id_cliente} → Taxi {id_taxi}")
-
-    print("\nTaxis:")
-    for t in sistema.snapshot_taxis():
-        print(t)
-
-    print("\nClientes:")
-    for c in sistema.snapshot_clientes():
-        print(c)
-
-
+# Si ejecutas: python -m backend.main → hace una demo pequeñita en consola
 if __name__ == "__main__":
-    crear_escenario(num_taxis=3, num_clientes=5)
-    esperar_final_clientes(timeout=8.0)
-    mostrar_resumen()
-    if sistema is not None:
-        sistema.detener()
+    crear_escenario()
+    print("[MAIN] Sistema inicializado. Ejecuta python -m backend.api para usar la API Flask.")

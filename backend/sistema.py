@@ -321,13 +321,13 @@ class SistemaAtencion:
     # ------------------------------------------------------------------
 
     def _bucle_simulacion(self) -> None:
-        """
-        Hilo que simula el paso del tiempo para los viajes.
+    #    """
+    #    Hilo que simula el paso del tiempo para los viajes.
 
-        Cada 5 segundos de tiempo real:
-        - Reduce tiempo_restante de viajes pendientes/aceptados.
-        - Cuando llega a 0 → finaliza el viaje y libera taxi.
-        """
+    #    Cada 5 segundos de tiempo real:
+    #   - Reduce tiempo_restante de viajes pendientes/aceptados.
+    #    - Cuando llega a 0 → finaliza el viaje y libera taxi.
+     #   
         while not self._detener:
             time.sleep(5.0)
             with self._lock:
@@ -335,13 +335,20 @@ class SistemaAtencion:
                     if v["estado"] in ("pendiente", "aceptado") and v.get("tiempo_restante") is not None:
                         if v["tiempo_restante"] > 0:
                             v["tiempo_restante"] -= 1
+                            print(
+                                f"[SIM] Viaje {v['id_viaje']} → tiempo_restante = {v['tiempo_restante']}"
+                            )
                         if v["tiempo_restante"] <= 0 and v["estado"] != "finalizado":
                             v["estado"] = "finalizado"
                             taxi_id = v["taxi_id"]
                             for t in self._taxis:
                                 if t.id == taxi_id:
                                     t.ocupado = False
+                                    print(
+                                        f"[SIM] Viaje {v['id_viaje']} finalizado. Taxi {taxi_id} vuelve a estar LIBRE."
+                                    )
                                     break
+
 
     # ------------------------------------------------------------------
     # Cierre contable
