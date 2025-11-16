@@ -9,7 +9,7 @@ const LUGARES = [
   "Estación Norte"
 ];
 
-function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
+function PassengerPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
   const [origen, setOrigen] = useState(() => {
     const idx = Math.floor(Math.random() * LUGARES.length);
     return LUGARES[idx];
@@ -25,6 +25,31 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
   const [mensaje, setMensaje] = useState("");
   const [valoracion, setValoracion] = useState(0);
   const [mensajeValoracion, setMensajeValoracion] = useState("");
+
+  // Buscar el viaje real en el backend (para tener estado y tiempo_restante actualizados)
+  const viajeActivo =
+    infoViaje && viajes && viajes.length > 0
+      ? viajes.find((v) => v.id_viaje === infoViaje.id_viaje) || infoViaje
+      : infoViaje;
+
+  // Cálculo de progreso
+  let progreso = null;
+  let tiempoRestante = null;
+  let estadoViaje = null;
+
+  if (viajeActivo) {
+    const total = Number(viajeActivo.duracion_min || 0);
+    const restante = Number(
+      viajeActivo.tiempo_restante != null ? viajeActivo.tiempo_restante : 0
+    );
+    estadoViaje = viajeActivo.estado || "pendiente";
+
+    if (total > 0) {
+      const hecho = total - restante;
+      progreso = Math.max(0, Math.min(1, hecho / total));
+      tiempoRestante = Math.max(0, restante);
+    }
+  }
 
   const solicitarViaje = async () => {
     try {
@@ -42,7 +67,7 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
 
       const data = await resp.json();
 
-      // Caso: no hay taxis libres → ok === false, motivo === "sin_taxis"
+      // Caso: no hay taxis libres
       if (data.ok === false && data.motivo === "sin_taxis") {
         setEsperaInfo(data);
         setMensaje(
@@ -84,6 +109,8 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
       }
       setMensaje("Has cancelado el viaje.");
       setInfoViaje(null);
+      setValoracion(0);
+      setMensajeValoracion("");
       onRefrescar && onRefrescar();
     } catch (e) {
       console.error(e);
@@ -92,7 +119,7 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
   };
 
   const enviarValoracion = async () => {
-    if (!infoViaje || valoracion < 1 || valoracion > 5) {
+    if (!viajeActivo || valoracion < 1 || valoracion > 5) {
       setMensajeValoracion("Elige entre 1 y 5 estrellas.");
       return;
     }
@@ -102,7 +129,7 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id_viaje: infoViaje.id_viaje,
+          id_viaje: viajeActivo.id_viaje,
           estrellas: valoracion
         })
       });
@@ -121,12 +148,21 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
     }
   };
 
+  // Solo mostramos las estrellas si el viaje ya está finalizado
+  const mostrarRating =
+    viajeActivo &&
+    estadoViaje === "finalizado" &&
+    viajeActivo.rating_cliente == null;
+
   return (
-    <div style={{ display: "grid", gap: "16px", gridTemplateColumns: "2fr 3fr" }}>
+    <div
+      style={{ display: "grid", gap: "16px", gridTemplateColumns: "2fr 3fr" }}
+    >
       <section>
         <h2 style={{ fontSize: "18px", marginBottom: "8px" }}>Vista pasajero</h2>
         <p style={{ fontSize: "13px", opacity: 0.8, marginBottom: "12px" }}>
-          Elige origen y destino y la app te asigna un taxi, calcula la tarifa y, al final, puedes calificar el servicio.
+          Elige origen y destino y la app te asigna un taxi, calcula la tarifa y,
+          cuando acabe el viaje, podrás calificar al conductor.
         </p>
 
         <div
@@ -208,7 +244,7 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
           )}
 
           {/* Caso: viaje creado */}
-          {infoViaje && (
+          {viajeActivo && (
             <div
               style={{
                 marginTop: "10px",
@@ -220,24 +256,62 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
               }}
             >
               <p style={{ margin: 0 }}>
-                Origen: <strong>{infoViaje.origen}</strong>
+                Origen: <strong>{viajeActivo.origen}</strong>
               </p>
               <p style={{ margin: 0 }}>
-                Destino: <strong>{infoViaje.destino}</strong>
+                Destino: <strong>{viajeActivo.destino}</strong>
               </p>
               <p style={{ margin: 0 }}>
-                Taxi asignado: <strong>#{infoViaje.taxi_id}</strong> (⭐{" "}
-                {infoViaje.rating_taxi})
+                Taxi asignado: <strong>#{viajeActivo.taxi_id}</strong> (⭐{" "}
+                {viajeActivo.rating_taxi})
               </p>
               <p style={{ margin: 0 }}>
-                Distancia aprox: {infoViaje.distancia_aprox_km} km
+                Distancia aprox: {viajeActivo.distancia_aprox_km} km
               </p>
               <p style={{ margin: 0 }}>
-                Tarifa estimada: <strong>{infoViaje.tarifa} €</strong>
+                Tarifa estimada: <strong>{viajeActivo.tarifa} €</strong>
               </p>
               <p style={{ margin: 0, fontSize: "12px", opacity: 0.8 }}>
-                Duración simulada del viaje: {infoViaje.duracion_min} minutos.
+                Duración simulada del viaje: {viajeActivo.duracion_min} minutos.
               </p>
+
+              {/* Barra de progreso */}
+              {progreso !== null && (
+                <div style={{ marginTop: "8px" }}>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: "12px",
+                      opacity: 0.8
+                    }}
+                  >
+                    Estado:{" "}
+                    <strong style={{ textTransform: "capitalize" }}>
+                      {estadoViaje}
+                    </strong>{" "}
+                    · Tiempo restante:{" "}
+                    <strong>{tiempoRestante} min</strong>
+                  </p>
+                  <div
+                    style={{
+                      marginTop: "4px",
+                      height: "8px",
+                      borderRadius: "999px",
+                      backgroundColor: "#111827",
+                      overflow: "hidden"
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${Math.round(progreso * 100)}%`,
+                        height: "100%",
+                        backgroundColor: "#22c55e",
+                        transition: "width 0.3s linear"
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              )}
 
               <div style={{ marginTop: "8px", display: "flex", gap: "8px" }}>
                 <button
@@ -252,7 +326,7 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
                     fontWeight: 600
                   }}
                 >
-                  Confirmado
+                  Viaje en curso
                 </button>
                 <button
                   onClick={cancelarViaje}
@@ -271,77 +345,91 @@ function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
                 </button>
               </div>
 
-              {/* Bloque de valoración tipo test de estrellas */}
-              <div
-                style={{
-                  marginTop: "10px",
-                  paddingTop: "8px",
-                  borderTop: "1px solid #1f2937"
-                }}
-              >
-                <p style={{ margin: 0, fontSize: "12px", opacity: 0.8 }}>
-                  Al finalizar el viaje, califica al conductor:
+              {!mostrarRating && estadoViaje !== "finalizado" && (
+                <p
+                  style={{
+                    marginTop: "8px",
+                    fontSize: "11px",
+                    opacity: 0.7
+                  }}
+                >
+                  Cuando el viaje termine podrás calificar al conductor.
                 </p>
+              )}
+
+              {/* Bloque de valoración solo cuando el viaje ha terminado */}
+              {mostrarRating && (
                 <div
                   style={{
-                    display: "flex",
-                    gap: "4px",
-                    marginTop: "4px",
-                    marginBottom: "4px"
+                    marginTop: "10px",
+                    paddingTop: "8px",
+                    borderTop: "1px solid #1f2937"
                   }}
                 >
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => setValoracion(n)}
-                      style={{
-                        width: "28px",
-                        height: "28px",
-                        borderRadius: "999px",
-                        border:
-                          valoracion === n
-                            ? "2px solid #facc15"
-                            : "1px solid #374151",
-                        backgroundColor:
-                          valoracion >= n ? "#fbbf24" : "#020617",
-                        color: valoracion >= n ? "#020617" : "#e5e7eb",
-                        cursor: "pointer",
-                        fontSize: "14px"
-                      }}
-                    >
-                      {n}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={enviarValoracion}
-                  style={{
-                    padding: "6px 10px",
-                    borderRadius: "999px",
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: "12px",
-                    backgroundColor: "#facc15",
-                    color: "#020617",
-                    fontWeight: 600
-                  }}
-                >
-                  Enviar valoración
-                </button>
-                {mensajeValoracion && (
-                  <p
+                  <p style={{ margin: 0, fontSize: "12px", opacity: 0.8 }}>
+                    El viaje ha finalizado. Valora al conductor:
+                  </p>
+                  <div
                     style={{
+                      display: "flex",
+                      gap: "4px",
                       marginTop: "4px",
-                      fontSize: "12px",
-                      color: "#fbbf24"
+                      marginBottom: "4px"
                     }}
                   >
-                    {mensajeValoracion}
-                  </p>
-                )}
-              </div>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setValoracion(n)}
+                        style={{
+                          width: "28px",
+                          height: "28px",
+                          borderRadius: "999px",
+                          border:
+                            valoracion === n
+                              ? "2px solid #facc15"
+                              : "1px solid #374151",
+                          backgroundColor:
+                            valoracion >= n ? "#fbbf24" : "#020617",
+                          color: valoracion >= n ? "#020617" : "#e5e7eb",
+                          cursor: "pointer",
+                          fontSize: "14px"
+                        }}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={enviarValoracion}
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: "999px",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      backgroundColor: "#facc15",
+                      color: "#020617",
+                      fontWeight: 600
+                    }}
+                  >
+                    Enviar valoración
+                  </button>
+                  {mensajeValoracion && (
+                    <p
+                      style={{
+                        marginTop: "4px",
+                        fontSize: "12px",
+                        color: "#fbbf24"
+                      }}
+                    >
+                      {mensajeValoracion}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
