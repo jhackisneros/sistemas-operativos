@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 
-function DriverPanel({ taxis, clientes, asignaciones }) {
-  // Para la demo, el taxi 0 es “yo”
+function DriverPanel({ taxis, clientes, asignaciones, onRefrescar }) {
+  const [mensaje, setMensaje] = useState("");
+
+  // Taxi 0 como "yo"
   const taxiYo = taxis.length > 0 ? taxis[0] : null;
 
   const asignacionesTaxiYo = taxiYo
@@ -12,13 +14,35 @@ function DriverPanel({ taxis, clientes, asignaciones }) {
     .map((a) => clientes.find((c) => c.id === a[0]))
     .filter(Boolean);
 
+  const aplicarCierre = async () => {
+    try {
+      setMensaje("");
+      const resp = await fetch("http://localhost:5000/cierre", {
+        method: "POST"
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        setMensaje(data.mensaje || "Error al aplicar cierre contable.");
+        return;
+      }
+      setMensaje(
+        "Cierre contable aplicado: se ha descontado el 20% de comisión a los taxis."
+      );
+      onRefrescar && onRefrescar();
+    } catch (e) {
+      console.error(e);
+      setMensaje("No se pudo conectar con la API para el cierre contable.");
+    }
+  };
+
   return (
     <div style={{ display: "grid", gap: "16px", gridTemplateColumns: "2fr 3fr" }}>
       {/* Info del conductor */}
       <section>
         <h2 style={{ fontSize: "18px", marginBottom: "8px" }}>Vista taxista</h2>
         <p style={{ fontSize: "13px", opacity: 0.8, marginBottom: "12px" }}>
-          Simula la pantalla de un conductor afiliado a UNIETAXI.
+          Simula la pantalla de un conductor afiliado a UNIETAXI, con sus
+          ganas y el cierre contable (20% de comisión).
         </p>
 
         <div
@@ -30,10 +54,6 @@ function DriverPanel({ taxis, clientes, asignaciones }) {
             border: "1px solid #1f2937"
           }}
         >
-          <h3 style={{ margin: 0, fontSize: "15px", marginBottom: "6px" }}>
-            Tu estado como conductor
-          </h3>
-
           {taxiYo ? (
             <>
               <p style={{ margin: 0, fontSize: "13px" }}>
@@ -51,10 +71,57 @@ function DriverPanel({ taxis, clientes, asignaciones }) {
               >
                 Estado: {taxiYo.ocupado ? "Ocupado con un servicio" : "Disponible"}
               </p>
-              <p style={{ marginTop: "8px", fontSize: "13px" }}>
-                Viajes asignados en esta simulación:{" "}
-                <strong>{asignacionesTaxiYo.length}</strong>
-              </p>
+
+              <div
+                style={{
+                  marginTop: "10px",
+                  padding: "8px",
+                  borderRadius: "12px",
+                  backgroundColor: "#020617",
+                  border: "1px solid #1f2937",
+                  fontSize: "13px"
+                }}
+              >
+                <p style={{ margin: 0 }}>
+                  Facturación del día (bruto):{" "}
+                  <strong>{taxiYo.total_bruto.toFixed(2)} €</strong>
+                </p>
+                <p style={{ margin: 0 }}>
+                  Total recibido (neto, tras comisiones):{" "}
+                  <strong>{taxiYo.total_neto.toFixed(2)} €</strong>
+                </p>
+                <p style={{ margin: 0 }}>
+                  Comisión total pagada a UNIETAXI:{" "}
+                  <strong>{taxiYo.total_comision.toFixed(2)} €</strong>
+                </p>
+                <p style={{ margin: 0 }}>
+                  Viajes realizados:{" "}
+                  <strong>{taxiYo.viajes_realizados}</strong>
+                </p>
+              </div>
+
+              <button
+                onClick={aplicarCierre}
+                style={{
+                  marginTop: "10px",
+                  padding: "8px 12px",
+                  borderRadius: "999px",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  backgroundColor: "#f97316",
+                  color: "#020617",
+                  fontWeight: 600
+                }}
+              >
+                Simular cierre contable (24h → 5 min)
+              </button>
+
+              {mensaje && (
+                <p style={{ marginTop: "8px", fontSize: "12px", color: "#fbbf24" }}>
+                  {mensaje}
+                </p>
+              )}
             </>
           ) : (
             <p style={{ margin: 0, fontSize: "13px" }}>
@@ -64,7 +131,7 @@ function DriverPanel({ taxis, clientes, asignaciones }) {
         </div>
       </section>
 
-      {/* Clientes asignados + tabla de servicios */}
+      {/* Clientes asignados + tabla servicios */}
       <section>
         <h3 style={{ fontSize: "15px", marginBottom: "8px" }}>
           Tus clientes asignados

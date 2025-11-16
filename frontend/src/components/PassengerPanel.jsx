@@ -1,29 +1,53 @@
-import React from "react";
+import React, { useState } from "react";
 
-function PassengerPanel({ taxis, clientes, asignaciones }) {
-  // Para la demo, el primer cliente es “yo”
-  const clienteYo = clientes.length > 0 ? clientes[0] : null;
+const LUGARES = [
+  "Retiro",
+  "Centro",
+  "Aeropuerto",
+  "Universidad",
+  "Estación Norte"
+];
 
-  let estadoTexto = "No hay cliente seleccionado.";
-  let taxiAsignado = null;
+function PassengerPanel({ taxis, clientes, asignaciones, onRefrescar }) {
+  const [origen, setOrigen] = useState("Retiro");
+  const [destino, setDestino] = useState("Centro");
+  const [infoViaje, setInfoViaje] = useState(null);
+  const [mensaje, setMensaje] = useState("");
 
-  if (clienteYo) {
-    const asignacion = asignaciones.find((a) => a[0] === clienteYo.id);
-    if (asignacion) {
-      taxiAsignado = taxis.find((t) => t.id === asignacion[1]);
-      estadoTexto = `Tienes un taxi asignado (Taxi ${asignacion[1]}).`;
-    } else {
-      estadoTexto = "Todavía no tienes taxi asignado.";
+  const solicitarViaje = async () => {
+    try {
+      setMensaje("");
+      setInfoViaje(null);
+
+      const resp = await fetch("http://localhost:5000/viaje", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ origen, destino })
+      });
+
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        setMensaje(data.mensaje || "No se pudo crear el viaje.");
+        return;
+      }
+
+      setInfoViaje(data);
+      setMensaje("Viaje creado correctamente. Taxi asignado.");
+      // Actualizamos estado global (tarjetas, taxis, etc.)
+      onRefrescar && onRefrescar();
+    } catch (e) {
+      console.error(e);
+      setMensaje("Error al conectar con la API de UNIETAXI.");
     }
-  }
+  };
 
   return (
     <div style={{ display: "grid", gap: "16px", gridTemplateColumns: "2fr 3fr" }}>
-      {/* Panel “tu viaje” */}
+      {/* Columna izquierda: formulario tipo Uber */}
       <section>
         <h2 style={{ fontSize: "18px", marginBottom: "8px" }}>Vista pasajero</h2>
         <p style={{ fontSize: "13px", opacity: 0.8, marginBottom: "12px" }}>
-          Simula la pantalla de un pasajero que ha pedido un UNIETAXI.
+          Elige origen y destino y la app te asigna un taxi y calcula la tarifa.
         </p>
 
         <div
@@ -35,14 +59,51 @@ function PassengerPanel({ taxis, clientes, asignaciones }) {
             border: "1px solid #1f2937"
           }}
         >
-          <h3 style={{ margin: 0, fontSize: "15px", marginBottom: "6px" }}>
-            Estado de tu viaje
+          <h3 style={{ margin: 0, fontSize: "15px", marginBottom: "10px" }}>
+            Solicitar un UNIETAXI
           </h3>
-          <p style={{ margin: 0, fontSize: "13px", opacity: 0.9 }}>
-            {clienteYo ? estadoTexto : "No hay datos de cliente en la simulación."}
-          </p>
 
-          {taxiAsignado && (
+          <div style={{ marginBottom: "8px" }}>
+            <label style={{ fontSize: "12px", opacity: 0.8 }}>Origen</label>
+            <select
+              value={origen}
+              onChange={(e) => setOrigen(e.target.value)}
+              style={selectEstilo}
+            >
+              {LUGARES.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ marginBottom: "8px" }}>
+            <label style={{ fontSize: "12px", opacity: 0.8 }}>Destino</label>
+            <select
+              value={destino}
+              onChange={(e) => setDestino(e.target.value)}
+              style={selectEstilo}
+            >
+              {LUGARES.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button onClick={solicitarViaje} style={botonVerde}>
+            Pedir UNIETAXI
+          </button>
+
+          {mensaje && (
+            <p style={{ marginTop: "8px", fontSize: "12px", color: "#fbbf24" }}>
+              {mensaje}
+            </p>
+          )}
+
+          {infoViaje && (
             <div
               style={{
                 marginTop: "10px",
@@ -53,22 +114,33 @@ function PassengerPanel({ taxis, clientes, asignaciones }) {
                 fontSize: "13px"
               }}
             >
-              <p style={{ margin: 0 }}>Taxi #{taxiAsignado.id}</p>
-              <p style={{ margin: 0, opacity: 0.8 }}>
-                Rating: {taxiAsignado.rating} ⭐
+              <p style={{ margin: 0 }}>
+                Origen: <strong>{infoViaje.origen}</strong>
               </p>
-              <p style={{ margin: 0, opacity: 0.7, fontSize: "12px" }}>
-                Posición aprox: ({taxiAsignado.x.toFixed(2)},{" "}
-                {taxiAsignado.y.toFixed(2)})
+              <p style={{ margin: 0 }}>
+                Destino: <strong>{infoViaje.destino}</strong>
+              </p>
+              <p style={{ margin: 0 }}>
+                Taxi asignado: <strong>#{infoViaje.taxi_id}</strong> (⭐{" "}
+                {infoViaje.rating_taxi})
+              </p>
+              <p style={{ margin: 0 }}>
+                Distancia aprox: {infoViaje.distancia_aprox_km} km
+              </p>
+              <p style={{ margin: 0 }}>
+                Tarifa estimada: <strong>{infoViaje.tarifa} €</strong>
+              </p>
+              <p style={{ margin: 0, fontSize: "12px", opacity: 0.8 }}>
+                Duración simulada: {infoViaje.duracion_min} min
               </p>
             </div>
           )}
         </div>
       </section>
 
-      {/* Panel “taxis cercanos” */}
+      {/* Columna derecha: lista de taxis (como antes) */}
       <section>
-        <h3 style={{ fontSize: "15px", marginBottom: "8px" }}>Taxis cercanos</h3>
+        <h3 style={{ fontSize: "15px", marginBottom: "8px" }}>Taxis activos</h3>
         {taxis.length === 0 ? (
           <p style={{ fontSize: "13px", opacity: 0.8 }}>
             No hay taxis en el sistema.
@@ -121,5 +193,28 @@ function PassengerPanel({ taxis, clientes, asignaciones }) {
     </div>
   );
 }
+
+const selectEstilo = {
+  width: "100%",
+  padding: "6px",
+  borderRadius: "8px",
+  border: "1px solid #1f2937",
+  marginTop: "2px",
+  backgroundColor: "#020617",
+  color: "white",
+  fontSize: "13px"
+};
+
+const botonVerde = {
+  marginTop: "8px",
+  padding: "8px 12px",
+  borderRadius: "999px",
+  border: "none",
+  cursor: "pointer",
+  fontSize: "13px",
+  backgroundColor: "#22c55e",
+  color: "#020617",
+  fontWeight: 600
+};
 
 export default PassengerPanel;

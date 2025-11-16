@@ -56,7 +56,7 @@ function App() {
         padding: "20px"
       }}
     >
-      {/* “Navbar” */}
+      {/* Navbar */}
       <header
         style={{
           display: "flex",
@@ -104,7 +104,7 @@ function App() {
         </div>
       </header>
 
-      {/* Barra de acciones */}
+      {/* Barra acciones */}
       <section
         style={{
           marginBottom: "20px",
@@ -167,7 +167,7 @@ function App() {
         />
       </section>
 
-      {/* Panel central tipo Uber */}
+      {/* Panel central */}
       <main
         style={{
           backgroundColor: "#020617",
@@ -182,12 +182,14 @@ function App() {
             taxis={taxis}
             clientes={clientes}
             asignaciones={asignaciones}
+            onRefrescar={cargarEstado}
           />
         ) : (
           <DriverPanel
             taxis={taxis}
             clientes={clientes}
             asignaciones={asignaciones}
+            onRefrescar={cargarEstado}
           />
         )}
       </main>
