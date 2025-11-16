@@ -14,7 +14,9 @@ IMPORTANTE:
 """
 
 from flask import Flask, jsonify
-from main import crear_escenario, sistema, clientes, taxis
+from .main import crear_escenario, sistema, clientes, taxis
+from flask import Flask, jsonify
+
 
 app = Flask(__name__)
 

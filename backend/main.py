@@ -9,10 +9,11 @@ Punto de entrada principal para la simulación de UNIETAXI (backend).
 - Espera a que los clientes terminen y muestra las asignaciones finales.
 """
 
-from sistema import SistemaAtencion
-from taxi import Taxi
-from cliente import Cliente
+from .sistema import SistemaAtencion
+from .taxi import Taxi
+from .cliente import Cliente
 import time
+
 
 # Variables globales simples (útiles si luego se quiere acceder desde api.py)
 sistema: SistemaAtencion
