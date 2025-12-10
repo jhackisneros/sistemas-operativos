@@ -2,17 +2,16 @@
 """
 Configura el escenario inicial de UNIETAXI.
 
-IMPORTANTE:
-- NO lanzamos hilos de clientes ni simulaciones raras aquí.
-- Solo creamos taxis (libres) y opcionalmente algunos clientes.
-- Arrancamos el monitor (SistemaAtencion.iniciar), que internamente
-  lanza los hilos de atención y de simulación de viajes.
+- Crea el monitor (SistemaAtencion).
+- Registra N taxis (libres) con posiciones aleatorias.
+- Opcionalmente registra algunos clientes.
+- Arranca los hilos internos del monitor (atención + simulación).
 """
 
 from .sistema import SistemaAtencion, Taxi, Cliente
 import random
 
-# Variables globales a las que accede api.py
+# Variables globales que usa api.py
 sistema: SistemaAtencion | None = None
 taxis: list[Taxi] = []
 clientes: list[Cliente] = []
@@ -25,9 +24,7 @@ def crear_escenario(num_taxis: int = 3, num_clientes: int = 0) -> SistemaAtencio
     """
     global sistema, taxis, clientes
 
-    # Creamos el monitor
     sistema = SistemaAtencion()
-
     taxis = []
     clientes = []
 
@@ -56,14 +53,14 @@ def crear_escenario(num_taxis: int = 3, num_clientes: int = 0) -> SistemaAtencio
         sistema.registrar_cliente(c)
         clientes.append(c)
 
-    # MUY IMPORTANTE: arrancar los hilos internos (atención + simulación)
+    # Arrancamos los hilos internos (atención + simulación)
     sistema.iniciar()
 
     print("[MAIN] Escenario creado con", len(taxis), "taxis y", len(clientes), "clientes.")
     return sistema
 
 
-# Si ejecutas: python -m backend.main → hace una demo pequeñita en consola
 if __name__ == "__main__":
+    # Demo mínima si ejecutas: python -m backend.main
     crear_escenario()
     print("[MAIN] Sistema inicializado. Ejecuta python -m backend.api para usar la API Flask.")
