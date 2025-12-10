@@ -6,6 +6,7 @@ except ImportError:
     CORS = None
 
 from . import main
+from .sistema import Cliente  # para crear clientes de prueba en los casos admin
 
 app = Flask(__name__)
 if CORS:
@@ -185,6 +186,134 @@ def cierre_contable():
 
     res = main.sistema.cierre_contable()
     return jsonify(res), 200
+
+
+# ------------------------------------------------------------------
+# ENDPOINTS DE ADMIN / CASOS DE CONCURRENCIA
+# ------------------------------------------------------------------
+
+
+@app.route("/admin/eventos", methods=["GET"])
+def admin_eventos():
+    """
+    Devuelve la lista de eventos registrados por el monitor
+    (asignaciones, sin taxis, cierre contable, etc.).
+    """
+    if main.sistema is None:
+        return jsonify({"ok": False, "mensaje": "Sistema no inicializado"}), 500
+
+    eventos = main.sistema.snapshot_eventos()
+    return jsonify({"ok": True, "eventos": eventos}), 200
+
+
+@app.route("/admin/test_doble_pasajero", methods=["POST"])
+def admin_test_doble_pasajero():
+    """
+    CASO 1:
+    Dos clientes piden taxi casi a la vez desde la misma posición.
+    Usa la cola clásica + hilo de atención.
+    """
+    if main.sistema is None:
+        return jsonify({"ok": False, "mensaje": "Sistema no inicializado"}), 500
+
+    s = main.sistema
+
+    c1 = Cliente(9001, 2.5, 2.5)
+    c2 = Cliente(9002, 2.5, 2.5)
+
+    s.registrar_cliente(c1)
+    s.registrar_cliente(c2)
+
+    # Encolamos casi "a la vez"
+    s.solicitar_taxi(c1)
+    s.solicitar_taxi(c2)
+
+    s.registrar_evento_admin(
+        "test_doble_pasajero",
+        "Lanzado CASO 1: dos clientes piden taxi casi a la vez.",
+        {"clientes": [c1.id, c2.id]},
+    )
+
+    return jsonify(
+        {
+            "ok": True,
+            "caso": 1,
+            "mensaje": "CASO 1 lanzado. Revisa los eventos en el panel admin.",
+        }
+    ), 200
+
+
+@app.route("/admin/test_sin_taxis", methods=["POST"])
+def admin_test_sin_taxis():
+    """
+    CASO 2:
+    Simular petición cuando no hay taxis libres.
+    Forzamos temporalmente todos los taxis a ocupado para que
+    crear_viaje_desde_lugares devuelva 'sin_taxis', y luego
+    restauramos el estado anterior.
+    """
+    if main.sistema is None:
+        return jsonify({"ok": False, "mensaje": "Sistema no inicializado"}), 500
+
+    s = main.sistema
+
+    # Guardamos estado actual de ocupación
+    with s._lock:  # usamos el lock del monitor (solo para este test)
+        estados_previos = [t.ocupado for t in s._taxis]
+        for t in s._taxis:
+            t.ocupado = True
+
+    # Esto debería devolver "ok=False, motivo=sin_taxis"
+    resultado = s.crear_viaje_desde_lugares("Centro", "Retiro")
+
+    # Restauramos estado anterior
+    with s._lock:
+        for t, ocupado_prev in zip(s._taxis, estados_previos):
+            t.ocupado = ocupado_prev
+
+    s.registrar_evento_admin(
+        "test_sin_taxis",
+        "Lanzado CASO 2: petición sin taxis libres.",
+        {"resultado": resultado},
+    )
+
+    return jsonify(
+        {
+            "ok": True,
+            "caso": 2,
+            "mensaje": "CASO 2 lanzado (sin taxis libres). Revisa los eventos.",
+        }
+    ), 200
+
+
+@app.route("/admin/test_competencia_taxis", methods=["POST"])
+def admin_test_competencia_taxis():
+    """
+    CASO 3:
+    Dos viajes 'tipo Uber' desde el mismo origen casi a la vez.
+    Muestra cómo el monitor asigna taxis y qué pasa si ya no quedan libres.
+    """
+    if main.sistema is None:
+        return jsonify({"ok": False, "mensaje": "Sistema no inicializado"}), 500
+
+    s = main.sistema
+
+    res1 = s.crear_viaje_desde_lugares("Centro", "Universidad")
+    res2 = s.crear_viaje_desde_lugares("Centro", "Universidad")
+
+    s.registrar_evento_admin(
+        "test_competencia_taxis",
+        "Lanzado CASO 3: dos viajes desde el mismo punto casi simultáneos.",
+        {"viaje1": res1, "viaje2": res2},
+    )
+
+    return jsonify(
+        {
+            "ok": True,
+            "caso": 3,
+            "mensaje": "CASO 3 lanzado (competencia por taxis). Revisa los eventos.",
+        }
+    ), 200
 
 
 if __name__ == "__main__":
