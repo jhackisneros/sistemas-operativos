@@ -63,7 +63,7 @@ class SistemaAtencion:
     - Hilo de simulación:
         * hace avanzar el tiempo de los viajes
         * libera taxis al terminar
-        * cada “día simulado” aplica el cierre contable (20%).
+        * aplica el cierre contable (20%) cuando hay viajes finalizados.
     """
 
     def __init__(self) -> None:
@@ -260,7 +260,10 @@ class SistemaAtencion:
         tarifa_base = 3.0
         tarifa_km = 2.0
         tarifa = round(tarifa_base + tarifa_km * distancia, 2)
-        duracion_min = round(max(3, distancia * 4), 1)
+
+        # Para la demo hacemos viajes cortos:
+        # 5 "minutos simulados" → ~25 segundos de tiempo real (5s por minuto)
+        duracion_min = 5
 
         with self._lock:
             self._contador_viajes += 1
@@ -324,8 +327,10 @@ class SistemaAtencion:
     def finalizar_viaje(self, id_viaje: int) -> bool:
         """
         Marca el viaje como finalizado y libera el taxi.
-        (el hilo de simulación también lo hace cuando tiempo_restante llega a 0)
+        Además, aplica un cierre contable para que se descuente el 20%.
         """
+        taxi_id = None
+
         with self._lock:
             viaje = None
             for v in self._historial_viajes:
@@ -352,6 +357,9 @@ class SistemaAtencion:
             f"Viaje {id_viaje} marcado como finalizado (acción del taxista).",
             {"id_viaje": id_viaje, "taxi_id": taxi_id},
         )
+
+        # Aplicamos cierre contable para que se vea el 20% en cuanto termina el viaje
+        self.cierre_contable()
         return True
 
     def cancelar_viaje(self, id_viaje: int) -> bool:
@@ -359,6 +367,8 @@ class SistemaAtencion:
         El pasajero cancela el viaje; si el taxi estaba ocupado por este viaje,
         se vuelve a liberar.
         """
+        taxi_id = None
+
         with self._lock:
             viaje = None
             for v in self._historial_viajes:
@@ -394,6 +404,8 @@ class SistemaAtencion:
         """
         if estrellas < 1 or estrellas > 5:
             return False
+
+        taxi_id = None
 
         with self._lock:
             viaje = None
@@ -446,13 +458,13 @@ class SistemaAtencion:
         - Avanza 1 minuto simulado.
         - Reduce tiempo_restante de viajes.
         - Libera taxis cuando termina un viaje.
-        - Cada 60 minutos simulados aplica cierre contable (20%).
+        - Si hay viajes finalizados, aplica cierre contable (20%).
         """
         while not self._detener:
             time.sleep(5.0)
 
-            hacer_cierre = False
             viajes_finalizados_auto: List[int] = []
+            hacer_cierre = False
 
             with self._lock:
                 # avanzamos reloj simulado
@@ -480,13 +492,16 @@ class SistemaAtencion:
                                     break
                             viajes_finalizados_auto.append(v["id_viaje"])
 
-                # cada 60 minutos simulados → 1 día
+                # si hemos avanzado 60 minutos simulados, consideramos fin de día simulado
                 if self._minutos_simulados > 0 and self._minutos_simulados % 60 == 0:
                     self._dias_simulados += 1
-                    hacer_cierre = True
                     print(
-                        f"[SIM] Fin del día simulado {self._dias_simulados}. Se aplicará cierre contable."
+                        f"[SIM] Fin del día simulado {self._dias_simulados}."
                     )
+
+                # si hay viajes finalizados automáticamente, queremos aplicar cierre
+                if viajes_finalizados_auto:
+                    hacer_cierre = True
 
             # Registrar finalización automática de viajes (fuera del lock)
             for id_v in viajes_finalizados_auto:
@@ -535,7 +550,7 @@ class SistemaAtencion:
         if resumen:
             self.registrar_evento_admin(
                 "cierre_contable",
-                "Aplicado cierre contable (20% de comisión) al final del día simulado.",
+                "Se ha aplicado cierre contable (20% de comisión) sobre la facturación acumulada.",
                 {"resumen": resumen},
             )
 
