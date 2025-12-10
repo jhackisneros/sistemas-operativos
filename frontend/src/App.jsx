@@ -5,8 +5,9 @@ import DriverPanel from "./components/DriverPanel.jsx";
 
 const API_URL = "http://localhost:5000";
 
+// 24h simuladas en bucle, a partir de minutos_simulados
 function formatearHora(minutos) {
-  const total = minutos % (24 * 60); // bucle de 24h
+  const total = minutos % (24 * 60); // bucle de 24 horas
   const h = Math.floor(total / 60);
   const m = total % 60;
   const pad = (n) => (n < 10 ? "0" + n : "" + n);
@@ -21,7 +22,7 @@ function App() {
     asignaciones: [],
     viajes: [],
     minutos_simulados: 0,
-    dias_simulados: 0,
+    dias_simulados: 0, // lo seguimos guardando por si lo usas en el informe, pero NO lo pintamos
   });
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
@@ -57,7 +58,7 @@ function App() {
   useEffect(() => {
     // Carga inicial
     cargarEstado();
-    // Auto-refresh cada 5 s para que el taxista vea “pop ups” de nuevos viajes
+    // Auto-refresh cada 5 s para que se actualicen taxis, viajes, etc.
     const id = setInterval(cargarEstado, 5000);
     return () => clearInterval(id);
   }, []);
@@ -68,10 +69,23 @@ function App() {
     asignaciones,
     viajes,
     minutos_simulados,
-    dias_simulados,
+    // dias_simulados,  // si lo quieres en algún momento lo tienes aquí
   } = datos;
 
   const relojTexto = formatearHora(minutos_simulados);
+
+  // ---------- Datos para las tarjetitas de resumen ----------
+  const totalTaxis = taxis.length;
+  const taxisLibres = taxis.filter((t) => !t.ocupado).length;
+  const taxisOcupados = totalTaxis - taxisLibres;
+
+  const totalViajes = viajes.length;
+  const viajesActivos = viajes.filter(
+    (v) => v.estado === "pendiente" || v.estado === "aceptado"
+  ).length;
+  const viajesFinalizados = viajes.filter(
+    (v) => v.estado === "finalizado"
+  ).length;
 
   return (
     <div
@@ -80,7 +94,8 @@ function App() {
         backgroundColor: "#020617",
         color: "#e5e7eb",
         padding: "16px",
-        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        fontFamily:
+          "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       }}
     >
       {/* Barra superior */}
@@ -91,12 +106,13 @@ function App() {
           gap: "12px",
           alignItems: "center",
           marginBottom: "16px",
+          flexWrap: "wrap",
         }}
       >
         <div>
           <h1 style={{ fontSize: "22px", marginBottom: "4px" }}>UNIETAXI</h1>
           <p style={{ fontSize: "13px", opacity: 0.8 }}>
-            Simulación concurrente · monitor + semáforos
+            Simulación de clientes y taxis con hilos, monitor y semáforos
           </p>
         </div>
 
@@ -142,7 +158,7 @@ function App() {
           </button>
         </div>
 
-        {/* Reloj simulado (siempre el mismo, da igual qué rol elijas) */}
+        {/* Reloj simulado (EL MISMO DE SIEMPRE, sin días) */}
         <div
           style={{
             textAlign: "right",
@@ -151,15 +167,92 @@ function App() {
             borderRadius: "12px",
             padding: "6px 10px",
             border: "1px solid #1f2937",
-            minWidth: "140px",
+            minWidth: "150px",
           }}
         >
-          <div style={{ opacity: 0.7 }}>Día simulado</div>
-          <div style={{ fontWeight: 600 }}>Día {dias_simulados}</div>
-          <div style={{ marginTop: "2px", opacity: 0.8 }}>Hora</div>
-          <div style={{ fontWeight: 600 }}>{relojTexto}</div>
+          <div style={{ opacity: 0.7 }}>Hora simulada</div>
+          <div style={{ fontWeight: 600, fontSize: "16px" }}>{relojTexto}</div>
+          <div style={{ marginTop: "2px", opacity: 0.6, fontSize: "11px" }}>
+            24h del día se recorren en pocos minutos reales
+          </div>
         </div>
       </header>
+
+      {/* Tarjetitas de resumen (taxis / viajes) */}
+      <section
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "12px",
+          marginBottom: "16px",
+        }}
+      >
+        <div
+          style={{
+            flex: "1 1 120px",
+            minWidth: "140px",
+            backgroundColor: "#020617",
+            borderRadius: "12px",
+            padding: "10px",
+            border: "1px solid #1f2937",
+          }}
+        >
+          <div style={{ fontSize: "12px", opacity: 0.7 }}>Taxis totales</div>
+          <div style={{ fontSize: "18px", fontWeight: 600 }}>{totalTaxis}</div>
+        </div>
+
+        <div
+          style={{
+            flex: "1 1 120px",
+            minWidth: "140px",
+            backgroundColor: "#020617",
+            borderRadius: "12px",
+            padding: "10px",
+            border: "1px solid #1f2937",
+          }}
+        >
+          <div style={{ fontSize: "12px", opacity: 0.7 }}>Taxis libres</div>
+          <div style={{ fontSize: "18px", fontWeight: 600 }}>{taxisLibres}</div>
+        </div>
+
+        <div
+          style={{
+            flex: "1 1 120px",
+            minWidth: "140px",
+            backgroundColor: "#020617",
+            borderRadius: "12px",
+            padding: "10px",
+            border: "1px solid #1f2937",
+          }}
+        >
+          <div style={{ fontSize: "12px", opacity: 0.7 }}>Taxis ocupados</div>
+          <div style={{ fontSize: "18px", fontWeight: 600 }}>
+            {taxisOcupados}
+          </div>
+        </div>
+
+        <div
+          style={{
+            flex: "1 1 160px",
+            minWidth: "160px",
+            backgroundColor: "#020617",
+            borderRadius: "12px",
+            padding: "10px",
+            border: "1px solid #1f2937",
+          }}
+        >
+          <div style={{ fontSize: "12px", opacity: 0.7 }}>Viajes activos</div>
+          <div style={{ fontSize: "16px", fontWeight: 600 }}>
+            {viajesActivos}{" "}
+            <span style={{ fontSize: "11px", opacity: 0.7 }}>
+              / {totalViajes} totales
+            </span>
+          </div>
+          <div style={{ fontSize: "11px", opacity: 0.7, marginTop: "4px" }}>
+            Finalizados: {viajesFinalizados}
+          </div>
+        </div>
+      </section>
 
       {/* Mensaje de error global */}
       {error && (
