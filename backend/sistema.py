@@ -456,8 +456,10 @@ class SistemaAtencion:
 
     def _bucle_simulacion(self) -> None:
         """
-        Cada 5 segundos de tiempo real:
-        - Avanza 1 minuto simulado.
+        Hilo de simulación de tiempo y viajes.
+
+        Cada ~0.2 segundos de tiempo real:
+        - Avanza 1 minuto simulado  → ~24h en unos 5 minutos reales.
         - Reduce tiempo_restante de viajes.
         - Libera taxis cuando termina un viaje.
         - Aplica cierre contable si hay viajes finalizados.
@@ -465,7 +467,8 @@ class SistemaAtencion:
           del frontend de pasajero.
         """
         while not self._detener:
-            time.sleep(5.0)
+            # 1 minuto simulado cada 0.2 segundos reales
+            time.sleep(0.2)
 
             viajes_finalizados_auto: List[int] = []
             hacer_cierre = False
@@ -496,7 +499,7 @@ class SistemaAtencion:
                                     break
                             viajes_finalizados_auto.append(v["id_viaje"])
 
-                # cada 60 minutos simulados → nuevo día simulado
+                # cada 60 minutos simulados → sumamos un “día simulado” interno (solo para estadísticas)
                 if self._minutos_simulados > 0 and self._minutos_simulados % 60 == 0:
                     self._dias_simulados += 1
                     print(
@@ -521,6 +524,7 @@ class SistemaAtencion:
 
             # Generar demanda automática (independiente de la app de pasajero)
             self._simular_demanda_automatica()
+
 
     def _simular_demanda_automatica(self) -> None:
         """
