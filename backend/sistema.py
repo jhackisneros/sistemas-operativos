@@ -2,6 +2,7 @@
 import threading
 import math
 import time
+import random
 from typing import List, Optional, Tuple, Dict
 
 # ----------------- Lugares simbólicos -----------------
@@ -63,6 +64,7 @@ class SistemaAtencion:
     - Hilo de simulación:
         * hace avanzar el tiempo de los viajes
         * libera taxis al terminar
+        * genera demanda automática
         * aplica el cierre contable (20%) cuando hay viajes finalizados.
     """
 
@@ -97,7 +99,7 @@ class SistemaAtencion:
             name="HiloSimulacionViajes",
         )
 
-        # Reloj simulado
+        # Reloj simulado (minutos acumulados + día)
         self._minutos_simulados: int = 0
         self._dias_simulados: int = 0
 
@@ -261,8 +263,8 @@ class SistemaAtencion:
         tarifa_km = 2.0
         tarifa = round(tarifa_base + tarifa_km * distancia, 2)
 
-        # Para la demo hacemos viajes cortos:
-        # 5 "minutos simulados" → ~25 segundos de tiempo real (5s por minuto)
+        # Para la demo: viajes cortos de 5 "minutos simulados"
+        # 5 min simulados → ~25 s reales (5 s por minuto)
         duracion_min = 5
 
         with self._lock:
@@ -358,7 +360,7 @@ class SistemaAtencion:
             {"id_viaje": id_viaje, "taxi_id": taxi_id},
         )
 
-        # Aplicamos cierre contable para que se vea el 20% en cuanto termina el viaje
+        # Cierre contable inmediato
         self.cierre_contable()
         return True
 
@@ -449,7 +451,7 @@ class SistemaAtencion:
         return True
 
     # ------------------------------------------------------------------
-    # Hilo de simulación: avanza viajes y hace cierre contable
+    # Hilo de simulación: tiempo + finalización + pasajeros automáticos
     # ------------------------------------------------------------------
 
     def _bucle_simulacion(self) -> None:
@@ -458,7 +460,9 @@ class SistemaAtencion:
         - Avanza 1 minuto simulado.
         - Reduce tiempo_restante de viajes.
         - Libera taxis cuando termina un viaje.
-        - Si hay viajes finalizados, aplica cierre contable (20%).
+        - Aplica cierre contable si hay viajes finalizados.
+        - Genera, con cierta probabilidad, viajes automáticos independientes
+          del frontend de pasajero.
         """
         while not self._detener:
             time.sleep(5.0)
@@ -492,7 +496,7 @@ class SistemaAtencion:
                                     break
                             viajes_finalizados_auto.append(v["id_viaje"])
 
-                # si hemos avanzado 60 minutos simulados, consideramos fin de día simulado
+                # cada 60 minutos simulados → nuevo día simulado
                 if self._minutos_simulados > 0 and self._minutos_simulados % 60 == 0:
                     self._dias_simulados += 1
                     print(
@@ -514,6 +518,27 @@ class SistemaAtencion:
             # hacemos el cierre FUERA del lock para no bloquear el hilo
             if hacer_cierre:
                 self.cierre_contable()
+
+            # Generar demanda automática (independiente de la app de pasajero)
+            self._simular_demanda_automatica()
+
+    def _simular_demanda_automatica(self) -> None:
+        """
+        Genera, con una pequeña probabilidad, un viaje nuevo entre dos
+        locaciones aleatorias. Esto hace que al taxista le vayan
+        apareciendo "pop ups" de nuevos pasajeros aunque ningún usuario
+        del frontend pulse nada.
+        """
+        # 30% de probabilidad cada tick de 5 segundos
+        if random.random() < 0.30:
+            lugares = list(LOCACIONES.keys())
+            if len(lugares) < 2:
+                return
+            origen, destino = random.sample(lugares, 2)
+            res = self.crear_viaje_desde_lugares(origen, destino)
+            if res.get("ok"):
+                # ya se registra evento "viaje_creado" dentro de crear_viaje_desde_lugares
+                pass
 
     # ------------------------------------------------------------------
     # Cierre contable (20%)
