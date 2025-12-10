@@ -1,45 +1,25 @@
 // frontend/src/components/DriverPanel.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+
+const API_URL = "http://localhost:5000";
 
 function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
   const [mensaje, setMensaje] = useState("");
-  const [reloj, setReloj] = useState("00:00");
 
-  // ⏰ Reloj simulado: 24 horas en 5 minutos reales
-  useEffect(() => {
-    const inicioReal = Date.now();
-    const DURACION_DIA_REAL_MS = 5 * 60 * 1000; // 5 minutos en ms
-    const MINUTOS_DIA_SIMULADO = 24 * 60; // 1440 minutos
-
-    const id = setInterval(() => {
-      const ahora = Date.now();
-      const transcurrido = ahora - inicioReal;
-
-      // Ciclo que se repite cada 5 minutos
-      const ciclo = transcurrido % DURACION_DIA_REAL_MS;
-
-      const fraccion = ciclo / DURACION_DIA_REAL_MS; // 0..1
-      const minutosSimulados = Math.floor(fraccion * MINUTOS_DIA_SIMULADO); // 0..1439
-
-      const horas = Math.floor(minutosSimulados / 60);
-      const minutos = minutosSimulados % 60;
-
-      const hh = horas.toString().padStart(2, "0");
-      const mm = minutos.toString().padStart(2, "0");
-      setReloj(`${hh}:${mm}`);
-    }, 500); // actualizamos 2 veces por segundo
-
-    return () => clearInterval(id);
-  }, []);
-
+  // Para simplificar: el "taxista logueado" es siempre el Taxi #0 (si existe)
   const taxiYo = taxis.length > 0 ? taxis[0] : null;
 
+  // Viajes asociados a ese taxi
   const viajesTaxiYo = taxiYo
     ? viajes.filter((v) => v.taxi_id === taxiYo.id)
     : [];
 
-  const viajesPendientes = viajesTaxiYo.filter((v) => v.estado === "pendiente");
-  const viajesAceptados = viajesTaxiYo.filter((v) => v.estado === "aceptado");
+  const viajesPendientes = viajesTaxiYo.filter(
+    (v) => v.estado === "pendiente"
+  );
+  const viajesAceptados = viajesTaxiYo.filter(
+    (v) => v.estado === "aceptado"
+  );
   const viajesFinalizados = viajesTaxiYo.filter(
     (v) => v.estado === "finalizado"
   );
@@ -47,17 +27,17 @@ function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
   const aceptarViaje = async (id_viaje) => {
     try {
       setMensaje("");
-      const resp = await fetch("http://localhost:5000/viaje/aceptar", {
+      const resp = await fetch(`${API_URL}/viaje/aceptar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id_viaje })
+        body: JSON.stringify({ id_viaje }),
       });
       const data = await resp.json();
       if (!resp.ok || !data.ok) {
         setMensaje(data.mensaje || "Error al aceptar el viaje.");
         return;
       }
-      setMensaje("Has aceptado el viaje " + id_viaje);
+      setMensaje("Has aceptado el viaje #" + id_viaje);
       onRefrescar && onRefrescar();
     } catch (e) {
       console.error(e);
@@ -68,17 +48,17 @@ function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
   const finalizarViaje = async (id_viaje) => {
     try {
       setMensaje("");
-      const resp = await fetch("http://localhost:5000/viaje/finalizar", {
+      const resp = await fetch(`${API_URL}/viaje/finalizar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id_viaje })
+        body: JSON.stringify({ id_viaje }),
       });
       const data = await resp.json();
       if (!resp.ok || !data.ok) {
         setMensaje(data.mensaje || "Error al finalizar el viaje.");
         return;
       }
-      setMensaje("Has finalizado el viaje " + id_viaje);
+      setMensaje("Has finalizado el viaje #" + id_viaje);
       onRefrescar && onRefrescar();
     } catch (e) {
       console.error(e);
@@ -86,145 +66,133 @@ function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
     }
   };
 
-  // Botón de cierre contable: lo sigues usando tú manualmente
-  const hacerCierre = async () => {
+  const aplicarCierre = async () => {
     try {
       setMensaje("");
-      const resp = await fetch("http://localhost:5000/cierre", {
-        method: "POST"
+      const resp = await fetch(`${API_URL}/cierre`, {
+        method: "POST",
       });
       const data = await resp.json();
       if (!resp.ok || !data.ok) {
-        setMensaje(data.mensaje || "Error al hacer el cierre contable.");
+        setMensaje(data.mensaje || "Error al aplicar cierre contable.");
         return;
       }
       setMensaje("Cierre contable aplicado.");
       onRefrescar && onRefrescar();
     } catch (e) {
       console.error(e);
-      setMensaje("No se pudo conectar con la API al hacer el cierre.");
+      setMensaje("No se pudo conectar con la API al aplicar el cierre.");
     }
   };
 
+  if (!taxiYo) {
+    return (
+      <div style={{ fontSize: "14px", opacity: 0.8 }}>
+        No hay taxis registrados en el sistema.
+      </div>
+    );
+  }
+
   return (
     <div
-      style={{ display: "grid", gap: "16px", gridTemplateColumns: "2fr 3fr" }}
+      style={{
+        display: "grid",
+        gap: "16px",
+        gridTemplateColumns: "minmax(260px, 1.5fr) minmax(320px, 2fr)",
+        alignItems: "flex-start",
+      }}
     >
+      {/* Columna izquierda: ficha del taxi */}
       <section>
-        <h2 style={{ fontSize: "18px", marginBottom: "8px" }}>Vista taxista</h2>
+        <h2 style={{ fontSize: "16px", marginBottom: "8px" }}>Vista taxista</h2>
 
-        {/* Reloj del día simulado */}
         <div
           style={{
-            marginBottom: "8px",
-            padding: "8px 10px",
-            borderRadius: "999px",
+            backgroundColor: "#020617",
+            borderRadius: "18px",
             border: "1px solid #1f2937",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "8px",
-            fontSize: "13px",
-            backgroundColor: "#020617"
+            padding: "14px 16px",
           }}
         >
-          <span style={{ opacity: 0.7 }}>
-            Reloj del día simulado (24h → 5 min):
-          </span>
-          <span
-            style={{
-              fontFamily: "monospace",
-              fontWeight: 600,
-              letterSpacing: "1px"
-            }}
-          >
-            {reloj}
-          </span>
-        </div>
-
-        {taxiYo ? (
-          <div
-            style={{
-              marginTop: "8px",
-              background:
-                "radial-gradient(circle at top left, #0ea5e933, transparent 60%)",
-              borderRadius: "16px",
-              padding: "14px",
-              border: "1px solid #1f2937"
-            }}
-          >
-            <h3 style={{ margin: 0, fontSize: "15px", marginBottom: "8px" }}>
-              Taxi #{taxiYo.id}
-            </h3>
-            <p style={{ margin: 0, fontSize: "13px" }}>
-              Posición aprox: ({taxiYo.x.toFixed(2)}, {taxiYo.y.toFixed(2)})
-            </p>
-            <p style={{ margin: 0, fontSize: "13px" }}>
-              Rating: ⭐ {taxiYo.rating}
-            </p>
-            <p style={{ margin: 0, fontSize: "13px" }}>
-              Estado:{" "}
-              <span style={{ color: taxiYo.ocupado ? "#f97316" : "#22c55e" }}>
-                {taxiYo.ocupado ? "Ocupado" : "Libre"}
-              </span>
-            </p>
-            <hr
+          <h3 style={{ marginBottom: "6px", fontSize: "15px" }}>
+            Taxi #{taxiYo.id}
+          </h3>
+          <p style={{ fontSize: "13px", margin: "2px 0" }}>
+            Posición aprox: ({taxiYo.x.toFixed(2)}, {taxiYo.y.toFixed(2)})
+          </p>
+          <p style={{ fontSize: "13px", margin: "2px 0" }}>
+            Rating: ⭐ {taxiYo.rating}
+          </p>
+          <p style={{ fontSize: "13px", margin: "2px 0" }}>
+            Estado:{" "}
+            <span
               style={{
-                borderColor: "#1f2937",
-                margin: "10px 0"
+                color: taxiYo.ocupado ? "#f97316" : "#22c55e",
+                fontWeight: 600,
               }}
-            />
-            <p style={{ margin: 0, fontSize: "13px" }}>
+            >
+              {taxiYo.ocupado ? "Ocupado" : "Libre"}
+            </span>
+          </p>
+
+          <hr
+            style={{
+              margin: "10px 0",
+              borderColor: "#111827",
+              opacity: 0.6,
+            }}
+          />
+
+          <div style={{ fontSize: "13px", lineHeight: 1.5 }}>
+            <p>
               Facturación del día (bruto):{" "}
               <strong>{taxiYo.total_bruto.toFixed(2)} €</strong>
             </p>
-            <p style={{ margin: 0, fontSize: "13px" }}>
+            <p>
               Total recibido (neto, tras comisiones):{" "}
               <strong>{taxiYo.total_neto.toFixed(2)} €</strong>
             </p>
-            <p style={{ margin: 0, fontSize: "13px" }}>
+            <p>
               Comisión total pagada a UNIETAXI:{" "}
               <strong>{taxiYo.total_comision.toFixed(2)} €</strong>
             </p>
-            <p style={{ margin: 0, fontSize: "13px" }}>
+            <p>
               Viajes realizados: <strong>{taxiYo.viajes_realizados}</strong>
             </p>
+          </div>
 
-            <button
-              onClick={hacerCierre}
+          <button
+            onClick={aplicarCierre}
+            style={{
+              marginTop: "10px",
+              padding: "8px 12px",
+              borderRadius: "999px",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "13px",
+              backgroundColor: "#facc15",
+              color: "#020617",
+              fontWeight: 600,
+            }}
+          >
+            Aplicar cierre contable (20 %)
+          </button>
+
+          {mensaje && (
+            <p
               style={{
-                marginTop: "10px",
-                padding: "6px 10px",
-                borderRadius: "999px",
-                border: "none",
-                backgroundColor: "#eab308",
-                color: "#020617",
+                marginTop: "8px",
                 fontSize: "12px",
-                fontWeight: 600,
-                cursor: "pointer"
+                color: "#fbbf24",
               }}
             >
-              Aplicar cierre contable (20 %)
-            </button>
-
-            {mensaje && (
-              <p
-                style={{
-                  marginTop: "8px",
-                  fontSize: "12px",
-                  color: "#fbbf24"
-                }}
-              >
-                {mensaje}
-              </p>
-            )}
-          </div>
-        ) : (
-          <p style={{ fontSize: "13px", opacity: 0.8 }}>
-            No hay taxis registrados en el sistema.
-          </p>
-        )}
+              {mensaje}
+            </p>
+          )}
+        </div>
       </section>
 
+      {/* Columna derecha: viajes */}
       <section>
         <h3 style={{ fontSize: "15px", marginBottom: "6px" }}>
           Viajes pendientes (nuevos pasajeros)
@@ -234,22 +202,58 @@ function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
             No tienes viajes pendientes.
           </p>
         ) : (
-          <div style={panelLista}>
+          <div
+            style={{
+              backgroundColor: "#020617",
+              borderRadius: "16px",
+              border: "1px solid #1f2937",
+              padding: "10px",
+              marginBottom: "10px",
+              maxHeight: "150px",
+              overflowY: "auto",
+            }}
+          >
             {viajesPendientes.map((v) => (
-              <FilaViaje
+              <div
                 key={v.id_viaje}
-                viaje={v}
-                accion="Aceptar"
-                onClick={() => aceptarViaje(v.id_viaje)}
-                color="#22c55e"
-              />
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "6px 4px",
+                  borderBottom: "1px solid #111827",
+                  fontSize: "13px",
+                }}
+              >
+                <div>
+                  <div>
+                    #{v.id_viaje} · {v.origen} → {v.destino}
+                  </div>
+                  <div style={{ fontSize: "11px", opacity: 0.8 }}>
+                    Tarifa: {v.tarifa} € · {v.duracion_min} min
+                  </div>
+                </div>
+                <button
+                  onClick={() => aceptarViaje(v.id_viaje)}
+                  style={{
+                    padding: "4px 8px",
+                    borderRadius: "999px",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    backgroundColor: "#22c55e",
+                    color: "#020617",
+                    fontWeight: 600,
+                  }}
+                >
+                  Aceptar
+                </button>
+              </div>
             ))}
           </div>
         )}
 
-        <h3
-          style={{ fontSize: "15px", marginBottom: "6px", marginTop: "10px" }}
-        >
+        <h3 style={{ fontSize: "15px", marginBottom: "6px" }}>
           Viajes en curso / aceptados
         </h3>
         {viajesAceptados.length === 0 ? (
@@ -257,22 +261,59 @@ function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
             No tienes viajes en curso.
           </p>
         ) : (
-          <div style={panelLista}>
+          <div
+            style={{
+              backgroundColor: "#020617",
+              borderRadius: "16px",
+              border: "1px solid #1f2937",
+              padding: "10px",
+              marginBottom: "10px",
+              maxHeight: "150px",
+              overflowY: "auto",
+            }}
+          >
             {viajesAceptados.map((v) => (
-              <FilaViaje
+              <div
                 key={v.id_viaje}
-                viaje={v}
-                accion="Finalizar"
-                onClick={() => finalizarViaje(v.id_viaje)}
-                color="#f97316"
-              />
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "6px 4px",
+                  borderBottom: "1px solid #111827",
+                  fontSize: "13px",
+                }}
+              >
+                <div>
+                  <div>
+                    #{v.id_viaje} · {v.origen} → {v.destino}
+                  </div>
+                  <div style={{ fontSize: "11px", opacity: 0.8 }}>
+                    Tarifa: {v.tarifa} € · {v.duracion_min} min ·{" "}
+                    {v.tiempo_restante} min restantes
+                  </div>
+                </div>
+                <button
+                  onClick={() => finalizarViaje(v.id_viaje)}
+                  style={{
+                    padding: "4px 8px",
+                    borderRadius: "999px",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    backgroundColor: "#f97316",
+                    color: "#020617",
+                    fontWeight: 600,
+                  }}
+                >
+                  Finalizar
+                </button>
+              </div>
             ))}
           </div>
         )}
 
-        <h3
-          style={{ fontSize: "15px", marginBottom: "6px", marginTop: "10px" }}
-        >
+        <h3 style={{ fontSize: "15px", marginBottom: "6px" }}>
           Viajes finalizados
         </h3>
         {viajesFinalizados.length === 0 ? (
@@ -280,14 +321,23 @@ function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
             Aún no tienes viajes finalizados.
           </p>
         ) : (
-          <div style={panelLista}>
+          <div
+            style={{
+              backgroundColor: "#020617",
+              borderRadius: "16px",
+              border: "1px solid #1f2937",
+              padding: "10px",
+              maxHeight: "180px",
+              overflowY: "auto",
+              fontSize: "13px",
+            }}
+          >
             {viajesFinalizados.map((v) => (
               <div
                 key={v.id_viaje}
                 style={{
-                  padding: "6px 4px",
+                  padding: "4px 2px",
                   borderBottom: "1px solid #111827",
-                  fontSize: "13px"
                 }}
               >
                 <div>
@@ -296,7 +346,7 @@ function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
                 <div style={{ fontSize: "11px", opacity: 0.8 }}>
                   Tarifa: {v.tarifa} € · {v.duracion_min} min ·{" "}
                   {v.rating_cliente
-                    ? `Valoración cliente: ${v.rating_cliente}★`
+                    ? `Valoración: ${v.rating_cliente}⭐`
                     : "Sin valoración"}
                 </div>
               </div>
@@ -307,54 +357,5 @@ function DriverPanel({ taxis, clientes, asignaciones, viajes, onRefrescar }) {
     </div>
   );
 }
-
-function FilaViaje({ viaje, accion, onClick, color }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "6px 4px",
-        borderBottom: "1px solid #111827",
-        fontSize: "13px"
-      }}
-    >
-      <div>
-        <div>
-          #{viaje.id_viaje} · {viaje.origen} → {viaje.destino}
-        </div>
-        <div style={{ fontSize: "11px", opacity: 0.8 }}>
-          Tarifa: {viaje.tarifa} € · {viaje.duracion_min} min
-        </div>
-      </div>
-      <button
-        onClick={onClick}
-        style={{
-          padding: "4px 8px",
-          borderRadius: "999px",
-          border: "none",
-          cursor: "pointer",
-          fontSize: "12px",
-          backgroundColor: color,
-          color: "#020617",
-          fontWeight: 600
-        }}
-      >
-        {accion}
-      </button>
-    </div>
-  );
-}
-
-const panelLista = {
-  backgroundColor: "#020617",
-  borderRadius: "16px",
-  border: "1px solid #1f2937",
-  padding: "10px",
-  marginBottom: "10px",
-  maxHeight: "150px",
-  overflowY: "auto"
-};
 
 export default DriverPanel;
